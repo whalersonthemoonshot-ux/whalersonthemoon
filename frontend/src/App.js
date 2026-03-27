@@ -1,53 +1,397 @@
-import { useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import axios from "axios";
+import { ExternalLink, Bell, Waves, RefreshCw } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+const REFRESH_INTERVAL = 30000; // 30 seconds
 
-const Home = () => {
-  const helloWorldApi = async () => {
+// ASCII Art Whale
+const ASCII_WHALE = `
+    .---.
+   /     \\
+  | () () |
+   \\  ^  /
+    |||||
+    |||||
+`;
+
+// Format currency to CAD
+const formatCAD = (amount) => {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
+
+// Format currency to USD
+const formatUSD = (amount) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
+
+// Format timestamp
+const formatTime = (timestamp) => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+};
+
+// Subscribe Modal Component
+const SubscribeModal = ({ isOpen, onClose }) => {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("idle"); // idle, loading, success, error
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setStatus("loading");
+    setError("");
+
     try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
+      await axios.post(`${API}/subscribe`, { email });
+      setStatus("success");
+      setEmail("");
+    } catch (err) {
+      setStatus("error");
+      if (err.response?.data?.detail) {
+        setError(err.response.data.detail);
+      } else {
+        setError("Failed to subscribe. Please try again.");
+      }
     }
   };
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+  if (!isOpen) return null;
 
   return (
-    <div>
-      <header className="App-header">
+    <div className="modal-overlay" onClick={onClose} data-testid="subscribe-modal">
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose} data-testid="modal-close-btn">
+          ×
+        </button>
+        
+        {status === "success" ? (
+          <div className="modal-success" data-testid="subscribe-success">
+            <pre className="ascii-whale" style={{ fontSize: '0.5rem', marginBottom: '1rem' }}>
+{`   __
+  / _)
+ ( (
+  \\ \\__
+   \\___)`}
+            </pre>
+            <p>SUBSCRIPTION CONFIRMED</p>
+            <p style={{ marginTop: '0.5rem', color: 'var(--terminal-green-dim)' }}>
+              You'll receive alerts for whale moves &gt; $100K CAD
+            </p>
+          </div>
+        ) : (
+          <>
+            <h2 className="modal-title">SUBSCRIBE FOR ALERTS</h2>
+            <p className="modal-subtitle">
+              Get notified when whales make big moves (&gt;$100K CAD)
+            </p>
+            
+            {error && <p className="modal-error">{error}</p>}
+            
+            <form onSubmit={handleSubmit}>
+              <input
+                type="email"
+                className="modal-input"
+                placeholder="ENTER EMAIL ADDRESS"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                data-testid="email-input"
+              />
+              <button
+                type="submit"
+                className="modal-submit"
+                disabled={status === "loading"}
+                data-testid="subscribe-submit-btn"
+              >
+                {status === "loading" ? "PROCESSING..." : "SUBSCRIBE"}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Transaction Row Component
+const TransactionRow = ({ transaction }) => {
+  return (
+    <div className="transaction-row" data-testid={`transaction-${transaction.signature.slice(0, 8)}`}>
+      <div>
+        <span className={`network-badge ${transaction.network}`}>
+          {transaction.network.toUpperCase()}
+        </span>
+      </div>
+      
+      <div className="token-info">
+        <span className="token-name">
+          {transaction.token_name} ({transaction.token_symbol})
+        </span>
+        <span className="token-addresses">
+          {transaction.from_address} → {transaction.to_address}
+        </span>
+        <span className="timestamp">
+          {formatTime(transaction.timestamp)} | {transaction.transaction_type.toUpperCase()}
+        </span>
+      </div>
+      
+      <div className="amount-info">
+        <div className="amount-cad" data-testid="transaction-amount-cad">
+          {formatCAD(transaction.amount_cad)}
+        </div>
+        <div className="amount-usd">
+          {formatUSD(transaction.amount_usd)} USD
+        </div>
+      </div>
+      
+      <div>
         <a
-          className="App-link"
-          href="https://emergent.sh"
+          href={transaction.explorer_url}
           target="_blank"
           rel="noopener noreferrer"
+          className="explorer-link"
+          data-testid="explorer-link"
         >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
+          <ExternalLink size={14} />
+          View on Explorer
         </a>
-        <p className="mt-5">Building something incredible ~!</p>
+      </div>
+    </div>
+  );
+};
+
+// Main Dashboard Component
+const Dashboard = () => {
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeNetwork, setActiveNetwork] = useState("all");
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchTransactions = useCallback(async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) {
+      setIsRefreshing(true);
+    }
+
+    try {
+      const networkParam = activeNetwork === "all" ? "" : `?network=${activeNetwork}`;
+      const response = await axios.get(`${API}/transactions${networkParam}`);
+      setTransactions(response.data.transactions);
+      setLastUpdated(new Date());
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching transactions:", err);
+      setError("Failed to fetch whale transactions");
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [activeNetwork]);
+
+  useEffect(() => {
+    fetchTransactions();
+    
+    // Set up auto-refresh
+    const interval = setInterval(() => {
+      fetchTransactions(true);
+    }, REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [fetchTransactions]);
+
+  // Calculate stats
+  const totalVolume = transactions.reduce((sum, tx) => sum + tx.amount_cad, 0);
+  const solanaCount = transactions.filter(tx => tx.network === "solana").length;
+  const baseCount = transactions.filter(tx => tx.network === "base").length;
+  const largestTx = transactions.length > 0 
+    ? Math.max(...transactions.map(tx => tx.amount_cad))
+    : 0;
+
+  const filteredTransactions = activeNetwork === "all" 
+    ? transactions 
+    : transactions.filter(tx => tx.network === activeNetwork);
+
+  return (
+    <div className="App">
+      {/* Scanline Overlay */}
+      <div className="scanline-overlay" />
+
+      {/* Header */}
+      <header className="terminal-header">
+        <div className="header-content">
+          <div className="logo-section">
+            <pre className="ascii-whale" data-testid="ascii-whale">
+{`   __
+  / _)
+ ( (
+  \\ \\__
+   \\___)`}
+            </pre>
+            <div>
+              <h1 className="app-title" data-testid="app-title">WHALERS ON THE MOON</h1>
+              <p className="app-subtitle">REAL-TIME WHALE TRANSACTION TRACKER</p>
+            </div>
+          </div>
+          
+          <button 
+            className="subscribe-btn" 
+            onClick={() => setShowSubscribeModal(true)}
+            data-testid="subscribe-btn"
+          >
+            <Bell size={18} />
+            SUBSCRIBE FOR ALERTS
+          </button>
+        </div>
       </header>
+
+      {/* Main Content */}
+      <main className="main-content">
+        {/* Stats Bar */}
+        <div className="stats-bar" data-testid="stats-bar">
+          <div className="stat-card">
+            <div className="stat-label">TOTAL VOLUME</div>
+            <div className="stat-value" data-testid="total-volume">{formatCAD(totalVolume)}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">LARGEST MOVE</div>
+            <div className="stat-value" data-testid="largest-move">{formatCAD(largestTx)}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">SOLANA TXS</div>
+            <div className="stat-value" data-testid="solana-count">{solanaCount}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">BASE TXS</div>
+            <div className="stat-value" data-testid="base-count">{baseCount}</div>
+          </div>
+        </div>
+
+        {/* Network Tabs */}
+        <div className="network-tabs" data-testid="network-tabs">
+          <button
+            className={`network-tab ${activeNetwork === "all" ? "active" : ""}`}
+            onClick={() => setActiveNetwork("all")}
+            data-testid="tab-all"
+          >
+            ALL
+          </button>
+          <button
+            className={`network-tab ${activeNetwork === "solana" ? "active" : ""}`}
+            onClick={() => setActiveNetwork("solana")}
+            data-testid="tab-solana"
+          >
+            SOLANA
+          </button>
+          <button
+            className={`network-tab ${activeNetwork === "base" ? "active" : ""}`}
+            onClick={() => setActiveNetwork("base")}
+            data-testid="tab-base"
+          >
+            BASE
+          </button>
+        </div>
+
+        {/* Transactions Section */}
+        <div className="transactions-section" data-testid="transactions-section">
+          <div className="section-header">
+            <h2 className="section-title">
+              <Waves size={18} />
+              BIG MOVES
+            </h2>
+            <div className="live-indicator">
+              {isRefreshing ? (
+                <RefreshCw size={12} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <span className="live-dot" />
+              )}
+              <span>
+                {isRefreshing ? "UPDATING..." : "LIVE"} 
+                {lastUpdated && ` | ${formatTime(lastUpdated)}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="transaction-list" data-testid="transaction-list">
+            {loading ? (
+              <div className="loading-container">
+                <pre className="ascii-loading">
+{`  |  
+ -+-
+  |  `}
+                </pre>
+                <p className="loading-text">SCANNING BLOCKCHAIN...</p>
+              </div>
+            ) : error ? (
+              <div className="empty-state">
+                <p className="empty-text" style={{ color: 'var(--terminal-error)' }}>{error}</p>
+              </div>
+            ) : filteredTransactions.length === 0 ? (
+              <div className="empty-state" data-testid="empty-state">
+                <pre className="empty-whale">
+{`        .
+       ":"
+     ___:____     |"\\/"|
+   ,'        \`.    \\  /
+   |  O        \\___/  |
+ ~^~^~^~^~^~^~^~^~^~^~^~^~`}
+                </pre>
+                <p className="empty-text">NO WHALE ACTIVITY DETECTED</p>
+                <p className="empty-text" style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
+                  MONITORING FOR TRANSACTIONS &gt; $100K CAD
+                </p>
+              </div>
+            ) : (
+              filteredTransactions.map((tx) => (
+                <TransactionRow key={tx.id || tx.signature} transaction={tx} />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="terminal-footer">
+          <p>WHALERS ON THE MOON v1.0 | TRACKING SOLANA & BASE NETWORKS</p>
+          <p>THRESHOLD: $100,000 CAD | AUTO-REFRESH: 30s</p>
+        </footer>
+      </main>
+
+      {/* Subscribe Modal */}
+      <SubscribeModal 
+        isOpen={showSubscribeModal} 
+        onClose={() => setShowSubscribeModal(false)} 
+      />
     </div>
   );
 };
 
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
