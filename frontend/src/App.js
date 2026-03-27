@@ -155,7 +155,7 @@ const TransactionRow = ({ transaction }) => {
       </div>
       
       <div className="amount-info">
-        <div className="amount-cad" data-testid="transaction-amount-cad">
+        <div className="amount-cad" data-testid={`amount-cad-${transaction.signature.slice(0, 8)}`}>
           {formatCAD(transaction.amount_cad)}
         </div>
         <div className="amount-usd">
@@ -195,8 +195,8 @@ const Dashboard = () => {
     }
 
     try {
-      const networkParam = activeNetwork === "all" ? "" : `?network=${activeNetwork}`;
-      const response = await axios.get(`${API}/transactions${networkParam}`);
+      // Always fetch all transactions, filtering is done client-side
+      const response = await axios.get(`${API}/transactions`);
       setTransactions(response.data.transactions);
       setLastUpdated(new Date());
       setError(null);
@@ -207,7 +207,7 @@ const Dashboard = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeNetwork]);
+  }, []); // Remove activeNetwork dependency
 
   useEffect(() => {
     fetchTransactions();
