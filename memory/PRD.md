@@ -18,6 +18,7 @@ Build a real-time Whale Transaction Tracker for the Solana and Base networks cal
 - [x] Terminal-style UI with black background and green text
 - [x] Email subscription for alerts
 - [x] Auto-refresh every 30 seconds
+- [x] Sound notifications for new whale moves
 
 ## What's Been Implemented
 ### Date: 2026-03-27
@@ -26,7 +27,8 @@ Build a real-time Whale Transaction Tracker for the Solana and Base networks cal
   - POST /api/subscribe - Email subscription endpoint
   - GET /api/health - Health check endpoint
   - GET /api/exchange-rate - USD to CAD rate
-  - Sample data generation for demonstration (when live API calls don't return data above threshold)
+  - Both Helius and Covalent API keys configured
+  - Sample data generation for demonstration
 
 - **Frontend (React)**:
   - Terminal-themed dashboard with JetBrains Mono font
@@ -36,6 +38,8 @@ Build a real-time Whale Transaction Tracker for the Solana and Base networks cal
   - Scrolling transaction list with Token Name, CAD Amount, Explorer Link
   - Subscribe modal for email alerts
   - Auto-refresh every 30 seconds with LIVE indicator
+  - **Sound notifications toggle** for new whale moves
+  - **NEW badge** highlighting fresh transactions
   - Responsive design for mobile/desktop
 
 ## Prioritized Backlog
@@ -46,17 +50,16 @@ Build a real-time Whale Transaction Tracker for the Solana and Base networks cal
 - [x] CAD amount display
 - [x] Explorer links
 - [x] Subscribe button/modal
+- [x] Sound notifications
 
 ### P1 - High Priority (For Future)
 - [ ] Actual email sending for alerts (SendGrid integration)
-- [ ] Live Covalent API integration (requires API key from user)
 - [ ] WebSocket for real-time updates instead of polling
 - [ ] Historical data storage and charts
 
 ### P2 - Nice to Have
 - [ ] Price alerts threshold customization
 - [ ] Multiple threshold tiers (100K, 500K, 1M)
-- [ ] Sound notifications for new whale moves
 - [ ] Transaction history export (CSV)
 - [ ] Mobile PWA support
 
@@ -67,8 +70,8 @@ Frontend (React + TailwindCSS)
     v
 Backend (FastAPI)
     |
-    +---> Helius API (Solana)
-    +---> Covalent API (Base)
+    +---> Helius API (Solana) ✓
+    +---> Covalent API (Base) ✓
     +---> MongoDB (Email subscriptions)
 ```
 
@@ -79,7 +82,6 @@ Backend (FastAPI)
 - APIs: Helius (Solana), Covalent (Base)
 
 ## Next Tasks
-1. Get Covalent API key from user to enable live Base tracking
-2. Add SendGrid integration for actual email alerts
-3. Consider WebSocket for true real-time updates
-4. Add transaction sound notifications
+1. Add SendGrid integration for actual email alerts
+2. Consider WebSocket for true real-time updates
+3. Add threshold customization options

@@ -579,3 +579,75 @@ body {
   letter-spacing: 0.1em;
   margin-top: 2rem;
 }
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Sound Toggle */
+.sound-toggle {
+  background-color: transparent;
+  border: 1px solid var(--terminal-border);
+  color: var(--terminal-green-dim);
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s linear;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sound-toggle:hover {
+  border-color: var(--terminal-green);
+  color: var(--terminal-green);
+}
+
+.sound-toggle.active {
+  border-color: var(--terminal-green);
+  color: var(--terminal-green);
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+/* New Transaction Animation */
+.new-transaction {
+  animation: newTxPulse 0.5s ease-out;
+  background-color: rgba(0, 255, 65, 0.1) !important;
+  border-left: 3px solid var(--terminal-green);
+}
+
+@keyframes newTxPulse {
+  0% {
+    background-color: rgba(0, 255, 65, 0.3);
+    transform: scale(1.01);
+  }
+  100% {
+    background-color: rgba(0, 255, 65, 0.1);
+    transform: scale(1);
+  }
+}
+
+/* New Badge */
+.new-badge {
+  display: inline-block;
+  background-color: var(--terminal-green);
+  color: var(--terminal-bg);
+  font-size: 0.5rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  margin-left: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  animation: badgePulse 1s infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}

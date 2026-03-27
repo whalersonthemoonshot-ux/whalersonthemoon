@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import axios from "axios";
-import { ExternalLink, Bell, Waves, RefreshCw } from "lucide-react";
+import { ExternalLink, Bell, Waves, RefreshCw, Volume2, VolumeX } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 const REFRESH_INTERVAL = 30000; // 30 seconds
+
+// Notification sound (base64 encoded short beep)
+const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRl9vT19LRUVQAFdBVkVmbXQgEAAAAAEAAQBBIgAAQCIAAQAIAGRhdGEAAPA/AAAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/";
 
 // ASCII Art Whale
 const ASCII_WHALE = `
@@ -133,9 +136,12 @@ const SubscribeModal = ({ isOpen, onClose }) => {
 };
 
 // Transaction Row Component
-const TransactionRow = ({ transaction }) => {
+const TransactionRow = ({ transaction, isNew }) => {
   return (
-    <div className="transaction-row" data-testid={`transaction-${transaction.signature.slice(0, 8)}`}>
+    <div 
+      className={`transaction-row ${isNew ? 'new-transaction' : ''}`} 
+      data-testid={`transaction-${transaction.signature.slice(0, 8)}`}
+    >
       <div>
         <span className={`network-badge ${transaction.network}`}>
           {transaction.network.toUpperCase()}
@@ -145,6 +151,7 @@ const TransactionRow = ({ transaction }) => {
       <div className="token-info">
         <span className="token-name">
           {transaction.token_name} ({transaction.token_symbol})
+          {isNew && <span className="new-badge">NEW</span>}
         </span>
         <span className="token-addresses">
           {transaction.from_address} → {transaction.to_address}
@@ -188,6 +195,58 @@ const Dashboard = () => {
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [newTransactionIds, setNewTransactionIds] = useState(new Set());
+  
+  const previousTransactionsRef = useRef([]);
+  const audioRef = useRef(null);
+
+  // Initialize audio
+  useEffect(() => {
+    audioRef.current = new Audio();
+    // Create a simple beep sound using Web Audio API
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880; // A5 note
+    gainNode.gain.value = 0.3;
+    
+    audioRef.current = { audioContext, oscillator, gainNode };
+    
+    return () => {
+      if (audioContext.state !== 'closed') {
+        audioContext.close();
+      }
+    };
+  }, []);
+
+  const playNotificationSound = useCallback(() => {
+    if (!soundEnabled) return;
+    
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(1100, audioContext.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (e) {
+      console.log('Audio notification not supported');
+    }
+  }, [soundEnabled]);
 
   const fetchTransactions = useCallback(async (showRefreshIndicator = false) => {
     if (showRefreshIndicator) {
@@ -197,7 +256,29 @@ const Dashboard = () => {
     try {
       // Always fetch all transactions, filtering is done client-side
       const response = await axios.get(`${API}/transactions`);
-      setTransactions(response.data.transactions);
+      const newTxs = response.data.transactions;
+      
+      // Check for new transactions (only after initial load)
+      if (previousTransactionsRef.current.length > 0) {
+        const previousIds = new Set(previousTransactionsRef.current.map(tx => tx.signature));
+        const brandNewTxs = newTxs.filter(tx => !previousIds.has(tx.signature));
+        
+        if (brandNewTxs.length > 0) {
+          // Play sound for new whale transactions
+          playNotificationSound();
+          
+          // Mark new transactions for highlight
+          setNewTransactionIds(new Set(brandNewTxs.map(tx => tx.signature)));
+          
+          // Clear highlight after 5 seconds
+          setTimeout(() => {
+            setNewTransactionIds(new Set());
+          }, 5000);
+        }
+      }
+      
+      previousTransactionsRef.current = newTxs;
+      setTransactions(newTxs);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
@@ -207,7 +288,7 @@ const Dashboard = () => {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, []); // Remove activeNetwork dependency
+  }, [playNotificationSound]); // Remove activeNetwork dependency
 
   useEffect(() => {
     fetchTransactions();
@@ -254,14 +335,25 @@ const Dashboard = () => {
             </div>
           </div>
           
-          <button 
-            className="subscribe-btn" 
-            onClick={() => setShowSubscribeModal(true)}
-            data-testid="subscribe-btn"
-          >
-            <Bell size={18} />
-            SUBSCRIBE FOR ALERTS
-          </button>
+          <div className="header-actions">
+            <button
+              className={`sound-toggle ${soundEnabled ? 'active' : ''}`}
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              data-testid="sound-toggle-btn"
+              title={soundEnabled ? "Sound On" : "Sound Off"}
+            >
+              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
+            
+            <button 
+              className="subscribe-btn" 
+              onClick={() => setShowSubscribeModal(true)}
+              data-testid="subscribe-btn"
+            >
+              <Bell size={18} />
+              SUBSCRIBE FOR ALERTS
+            </button>
+          </div>
         </div>
       </header>
 
@@ -363,7 +455,11 @@ const Dashboard = () => {
               </div>
             ) : (
               filteredTransactions.map((tx) => (
-                <TransactionRow key={tx.id || tx.signature} transaction={tx} />
+                <TransactionRow 
+                  key={tx.id || tx.signature} 
+                  transaction={tx} 
+                  isNew={newTransactionIds.has(tx.signature)}
+                />
               ))
             )}
           </div>
