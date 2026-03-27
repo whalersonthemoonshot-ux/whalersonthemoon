@@ -1,0 +1,95 @@
+{
+  "theme": "dark",
+  "archetype": "Retro-Futurism (Terminal Look)",
+  "typography": {
+    "font_family": {
+      "heading": "JetBrains Mono",
+      "body": "JetBrains Mono",
+      "mono": "JetBrains Mono"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl uppercase tracking-widest font-bold",
+      "h2": "text-2xl sm:text-3xl uppercase tracking-wider font-bold",
+      "h3": "text-xl sm:text-2xl uppercase tracking-wider",
+      "h4": "text-lg sm:text-xl uppercase tracking-wide",
+      "body": "text-base tracking-normal",
+      "small": "text-sm tracking-wide"
+    },
+    "guidelines": "Do not use any sans-serif or serif fonts. Everything must be monospace. Use uppercase for headings and labels to emulate old computer terminals. Maintain tight letter spacing for large text, and readable line height for body."
+  },
+  "colors": {
+    "background": {
+      "default": "#000000",
+      "surface": "#050505",
+      "overlay": "rgba(0, 255, 65, 0.05)"
+    },
+    "text": {
+      "primary": "#00FF41",
+      "secondary": "#008F11",
+      "muted": "#005a0b",
+      "inverse": "#000000"
+    },
+    "border": {
+      "default": "rgba(0, 255, 65, 0.3)",
+      "hover": "rgba(0, 255, 65, 0.8)",
+      "focus": "#39FF14"
+    },
+    "action": {
+      "primary": "#00FF41",
+      "primary_hover": "#39FF14",
+      "primary_text": "#000000",
+      "secondary_bg": "transparent",
+      "secondary_border": "#00FF41",
+      "secondary_hover_bg": "rgba(0, 255, 65, 0.1)"
+    },
+    "status": {
+      "success": "#00FF41",
+      "warning": "#FFD700",
+      "error": "#FF003C",
+      "info": "#00BFFF"
+    }
+  },
+  "spacing_and_layout": {
+    "grid_mode": "The Control Room Grid",
+    "container_padding": "p-6 sm:p-8",
+    "gap": "gap-4 sm:gap-6",
+    "radius": "rounded-none",
+    "alignment": "Strictly left-aligned text, sharp geometrical alignments, every pixel utilized."
+  },
+  "surface_strategies": {
+    "cards": "Retro-Futurism: Flat black background (#050505), sharp 1px or 2px border (border-[#00FF41]/40). No box-shadow for depth, but subtle drop-shadow for glow. No border-radius.",
+    "header": "Solid black background with a heavy bottom border (border-b-2 border-[#00FF41]). Sticky to top. Z-index 50.",
+    "buttons": "Sharp corners. Default: border border-[#00FF41] text-[#00FF41]. Hover: bg-[#00FF41] text-black drop-shadow-[0_0_8px_rgba(0,255,65,0.8)]."
+  },
+  "visual_enhancers": {
+    "scanlines": "MANDATORY overlay: pointer-events-none fixed inset-0 z-50 bg-[linear-gradient(rgba(0,255,65,0.03)_1px,transparent_1px)] bg-[size:100%_4px] opacity-50.",
+    "glow": "Use text-shadow: 0 0 5px #00ff41 on key data points (like amounts) and active headers.",
+    "animation": "Cursor blinking effect for title or loading states: animate-pulse. Transitions should be sharp (linear) or nonexistent to mimic instant terminal drawing.",
+    "icons": "Use Phosphor Icons (React) with 'duotone' or 'regular' weights. Sharp and technical.",
+    "empty_states": "Use ASCII art for empty states or loading indicators instead of standard spinners."
+  },
+  "component_instructions": {
+    "general": "Override all default Shadcn border-radius classes to 'rounded-none'. Remove default Vercel shadows.",
+    "card": "Remove bg-card, text-card-foreground. Force bg-[#050505] border-[#00FF41]/40 text-[#00FF41]. Add internal padding p-6.",
+    "button": "Force rounded-none, uppercase text. Primary buttons must be inverted (green background, black text).",
+    "table_or_list": "Borders between rows should be border-[#00FF41]/20. Hover rows should slightly light up bg-[#00FF41]/10.",
+    "inputs": "bg-black border border-[#00FF41]/50 text-[#00FF41] placeholder:text-[#00FF41]/30 focus-visible:ring-1 focus-visible:ring-[#00FF41] rounded-none."
+  },
+  "media": {
+    "image_urls": {
+      "hero_background": null,
+      "logo": null,
+      "ascii_art": "Use a text-based ASCII whale or moon in the header or empty state. E.g., `\\.____/` or `(O_O)` styled in green text."
+    },
+    "notes": "No standard images. This is a terminal UI. Emphasize typography, data, and CSS scanline effects."
+  },
+  "instructions_to_main_agent": [
+    "Install and configure 'JetBrains Mono' font from Google Fonts.",
+    "Implement the background scanline CSS overlay across the entire app.",
+    "Build the dashboard using pure terminal aesthetics: black backgrounds, glowing neon green text, sharp 1px borders, and zero border radius (rounded-none).",
+    "The transaction list should auto-refresh and ideally have a typewriter or instant pop-in effect rather than smooth sliding.",
+    "Ensure all numbers (Amount in CAD) are formatted nicely and maybe have a heavier text-shadow to make them pop.",
+    "For the 'View on Explorer' link, use an external link icon from Phosphor icons.",
+    "Add 'data-testid' to all interactive elements."
+  ]
+}
