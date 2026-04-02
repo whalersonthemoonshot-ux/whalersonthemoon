@@ -651,3 +651,74 @@ body {
     opacity: 0.7;
   }
 }
+
+/* Settings Button */
+.settings-btn {
+  background-color: transparent;
+  border: 1px solid var(--terminal-border);
+  color: var(--terminal-green-dim);
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s linear;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-btn:hover {
+  border-color: var(--terminal-green);
+  color: var(--terminal-green);
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+/* Settings Modal Styles */
+.settings-group {
+  margin-bottom: 1.5rem;
+}
+
+.settings-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--terminal-green);
+  margin-bottom: 0.75rem;
+}
+
+.settings-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.settings-option {
+  background-color: transparent;
+  border: 1px solid var(--terminal-border);
+  color: var(--terminal-green-dim);
+  padding: 0.5rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s linear;
+}
+
+.settings-option:hover {
+  border-color: var(--terminal-green);
+  color: var(--terminal-green);
+}
+
+.settings-option.active {
+  background-color: var(--terminal-green);
+  color: var(--terminal-bg);
+  border-color: var(--terminal-green);
+}
+
+.settings-hint {
+  font-size: 0.625rem;
+  color: var(--terminal-green-muted);
+  margin-top: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

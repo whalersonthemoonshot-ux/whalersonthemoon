@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import axios from "axios";
-import { ExternalLink, Bell, Waves, RefreshCw, Volume2, VolumeX } from "lucide-react";
+import { ExternalLink, Bell, Waves, RefreshCw, Volume2, VolumeX, Settings, X } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
-const REFRESH_INTERVAL = 30000; // 30 seconds
+const DEFAULT_REFRESH_INTERVAL = 30000; // 30 seconds
+const DEFAULT_THRESHOLD = 100000; // $100,000 CAD
 
 // Notification sound (base64 encoded short beep)
 const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRl9vT19LRUVQAFdBVkVmbXQgEAAAAAEAAQBBIgAAQCIAAQAIAGRhdGEAAPA/AAAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/";
@@ -135,6 +136,91 @@ const SubscribeModal = ({ isOpen, onClose }) => {
   );
 };
 
+// Settings Modal Component
+const SettingsModal = ({ isOpen, onClose, threshold, setThreshold, refreshInterval, setRefreshInterval }) => {
+  const [tempThreshold, setTempThreshold] = useState(threshold);
+  const [tempInterval, setTempInterval] = useState(refreshInterval / 1000); // Convert to seconds
+
+  const handleSave = () => {
+    setThreshold(tempThreshold);
+    setRefreshInterval(tempInterval * 1000); // Convert back to ms
+    onClose();
+  };
+
+  const thresholdOptions = [
+    { value: 50000, label: "$50K" },
+    { value: 100000, label: "$100K" },
+    { value: 250000, label: "$250K" },
+    { value: 500000, label: "$500K" },
+    { value: 1000000, label: "$1M" },
+  ];
+
+  const intervalOptions = [
+    { value: 10, label: "10s" },
+    { value: 15, label: "15s" },
+    { value: 30, label: "30s" },
+    { value: 60, label: "1min" },
+    { value: 120, label: "2min" },
+  ];
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose} data-testid="settings-modal">
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose} data-testid="settings-close-btn">
+          <X size={20} />
+        </button>
+        
+        <h2 className="modal-title">SETTINGS</h2>
+        <p className="modal-subtitle">Configure your whale tracker preferences</p>
+        
+        <div className="settings-group">
+          <label className="settings-label">WHALE THRESHOLD (CAD)</label>
+          <div className="settings-options">
+            {thresholdOptions.map((opt) => (
+              <button
+                key={opt.value}
+                className={`settings-option ${tempThreshold === opt.value ? 'active' : ''}`}
+                onClick={() => setTempThreshold(opt.value)}
+                data-testid={`threshold-${opt.value}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="settings-hint">Only show transactions above this value</p>
+        </div>
+
+        <div className="settings-group">
+          <label className="settings-label">AUTO-REFRESH INTERVAL</label>
+          <div className="settings-options">
+            {intervalOptions.map((opt) => (
+              <button
+                key={opt.value}
+                className={`settings-option ${tempInterval === opt.value ? 'active' : ''}`}
+                onClick={() => setTempInterval(opt.value)}
+                data-testid={`interval-${opt.value}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="settings-hint">How often to check for new whale moves</p>
+        </div>
+
+        <button
+          className="modal-submit"
+          onClick={handleSave}
+          data-testid="settings-save-btn"
+        >
+          SAVE SETTINGS
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Transaction Row Component
 const TransactionRow = ({ transaction, isNew }) => {
   return (
@@ -193,13 +279,17 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   const [activeNetwork, setActiveNetwork] = useState("all");
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [newTransactionIds, setNewTransactionIds] = useState(new Set());
+  const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
+  const [refreshInterval, setRefreshInterval] = useState(DEFAULT_REFRESH_INTERVAL);
   
   const previousTransactionsRef = useRef([]);
   const audioRef = useRef(null);
+  const intervalRef = useRef(null);
 
   // Initialize audio
   useEffect(() => {
@@ -293,25 +383,38 @@ const Dashboard = () => {
   useEffect(() => {
     fetchTransactions();
     
-    // Set up auto-refresh
-    const interval = setInterval(() => {
+    // Clear any existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    
+    // Set up auto-refresh with dynamic interval
+    intervalRef.current = setInterval(() => {
       fetchTransactions(true);
-    }, REFRESH_INTERVAL);
+    }, refreshInterval);
 
-    return () => clearInterval(interval);
-  }, [fetchTransactions]);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [fetchTransactions, refreshInterval]);
 
-  // Calculate stats
-  const totalVolume = transactions.reduce((sum, tx) => sum + tx.amount_cad, 0);
-  const solanaCount = transactions.filter(tx => tx.network === "solana").length;
-  const baseCount = transactions.filter(tx => tx.network === "base").length;
-  const largestTx = transactions.length > 0 
-    ? Math.max(...transactions.map(tx => tx.amount_cad))
+  // Filter transactions by threshold
+  const thresholdFilteredTxs = transactions.filter(tx => tx.amount_cad >= threshold);
+  
+  // Calculate stats from threshold-filtered transactions
+  const totalVolume = thresholdFilteredTxs.reduce((sum, tx) => sum + tx.amount_cad, 0);
+  const solanaCount = thresholdFilteredTxs.filter(tx => tx.network === "solana").length;
+  const baseCount = thresholdFilteredTxs.filter(tx => tx.network === "base").length;
+  const largestTx = thresholdFilteredTxs.length > 0 
+    ? Math.max(...thresholdFilteredTxs.map(tx => tx.amount_cad))
     : 0;
 
+  // Apply network filter on top of threshold filter
   const filteredTransactions = activeNetwork === "all" 
-    ? transactions 
-    : transactions.filter(tx => tx.network === activeNetwork);
+    ? thresholdFilteredTxs 
+    : thresholdFilteredTxs.filter(tx => tx.network === activeNetwork);
 
   return (
     <div className="App">
@@ -336,6 +439,15 @@ const Dashboard = () => {
           </div>
           
           <div className="header-actions">
+            <button
+              className="settings-btn"
+              onClick={() => setShowSettingsModal(true)}
+              data-testid="settings-btn"
+              title="Settings"
+            >
+              <Settings size={18} />
+            </button>
+            
             <button
               className={`sound-toggle ${soundEnabled ? 'active' : ''}`}
               onClick={() => setSoundEnabled(!soundEnabled)}
@@ -450,7 +562,7 @@ const Dashboard = () => {
                 </pre>
                 <p className="empty-text">NO WHALE ACTIVITY DETECTED</p>
                 <p className="empty-text" style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
-                  MONITORING FOR TRANSACTIONS &gt; $100K CAD
+                  MONITORING FOR TRANSACTIONS &gt; ${formatCAD(threshold).replace('$', '')}
                 </p>
               </div>
             ) : (
@@ -468,7 +580,7 @@ const Dashboard = () => {
         {/* Footer */}
         <footer className="terminal-footer">
           <p>WHALERS ON THE MOON v1.0 | TRACKING SOLANA & BASE NETWORKS</p>
-          <p>THRESHOLD: $100,000 CAD | AUTO-REFRESH: 30s</p>
+          <p>THRESHOLD: {formatCAD(threshold)} | AUTO-REFRESH: {refreshInterval / 1000}s</p>
         </footer>
       </main>
 
@@ -476,6 +588,16 @@ const Dashboard = () => {
       <SubscribeModal 
         isOpen={showSubscribeModal} 
         onClose={() => setShowSubscribeModal(false)} 
+      />
+      
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        threshold={threshold}
+        setThreshold={setThreshold}
+        refreshInterval={refreshInterval}
+        setRefreshInterval={setRefreshInterval}
       />
     </div>
   );
