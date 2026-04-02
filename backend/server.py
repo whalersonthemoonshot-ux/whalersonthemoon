@@ -11,6 +11,8 @@ import uuid
 from datetime import datetime, timezone
 import httpx
 import asyncio
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, To, Content
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -24,6 +26,8 @@ db = client[os.environ['DB_NAME']]
 HELIUS_API_KEY = os.environ.get('HELIUS_API_KEY', '')
 COVALENT_API_KEY = os.environ.get('COVALENT_API_KEY', '')
 USD_TO_CAD_RATE = float(os.environ.get('USD_TO_CAD_RATE', '1.38'))
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', '')
 
 # Whale threshold in CAD
 WHALE_THRESHOLD_CAD = 100000
@@ -40,6 +44,116 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+# ============== Email Service ==============
+
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """Send email via SendGrid"""
+    if not SENDGRID_API_KEY or not SENDER_EMAIL:
+        logger.warning("SendGrid not configured - skipping email")
+        return False
+    
+    try:
+        message = Mail(
+            from_email=Email(SENDER_EMAIL, "Whalers on the Moon"),
+            to_emails=To(to_email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        
+        if response.status_code == 202:
+            logger.info(f"Email sent successfully to {to_email}")
+            return True
+        else:
+            logger.error(f"Email failed with status {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Failed to send email: {e}")
+        return False
+
+
+def send_welcome_email(to_email: str) -> bool:
+    """Send welcome email to new subscriber"""
+    subject = "🐋 Welcome to Whalers on the Moon!"
+    
+    html_content = """
+    <html>
+    <body style="font-family: 'Courier New', monospace; background-color: #000; color: #00FF41; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; border: 2px solid #00FF41; padding: 30px;">
+            <h1 style="color: #00FF41; text-shadow: 0 0 10px #00FF41;">🐋 WHALERS ON THE MOON</h1>
+            <p>Welcome aboard, whale watcher!</p>
+            <p>You're now subscribed to receive alerts for whale transactions over <strong>$100,000 CAD</strong> on:</p>
+            <ul>
+                <li>🟣 Solana Network</li>
+                <li>🔵 Base Network</li>
+            </ul>
+            <p>When a whale makes a big move, you'll be the first to know.</p>
+            <p style="color: #008F11; margin-top: 30px;">Stay vigilant,<br>The Whalers Team</p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return send_email(to_email, subject, html_content)
+
+
+def send_whale_alert_email(to_email: str, transaction: dict) -> bool:
+    """Send whale alert email for a large transaction"""
+    network_emoji = "🟣" if transaction['network'] == "solana" else "🔵"
+    network_name = transaction['network'].upper()
+    
+    subject = f"🐋 WHALE ALERT: {transaction['token_symbol']} - ${transaction['amount_cad']:,.0f} CAD on {network_name}"
+    
+    html_content = f"""
+    <html>
+    <body style="font-family: 'Courier New', monospace; background-color: #000; color: #00FF41; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; border: 2px solid #00FF41; padding: 30px;">
+            <h1 style="color: #00FF41; text-shadow: 0 0 10px #00FF41;">🐋 WHALE ALERT!</h1>
+            
+            <div style="background: #050505; border: 1px solid #00FF41; padding: 20px; margin: 20px 0;">
+                <p><strong>Network:</strong> {network_emoji} {network_name}</p>
+                <p><strong>Token:</strong> {transaction['token_name']} ({transaction['token_symbol']})</p>
+                <p><strong>Amount:</strong> <span style="font-size: 24px; text-shadow: 0 0 5px #00FF41;">${transaction['amount_cad']:,.0f} CAD</span></p>
+                <p><strong>USD Value:</strong> ${transaction['amount_usd']:,.0f}</p>
+                <p><strong>Type:</strong> {transaction['transaction_type'].upper()}</p>
+                <p><strong>From:</strong> {transaction['from_address']}</p>
+                <p><strong>To:</strong> {transaction['to_address']}</p>
+            </div>
+            
+            <a href="{transaction['explorer_url']}" 
+               style="display: inline-block; background: #00FF41; color: #000; padding: 12px 24px; text-decoration: none; font-weight: bold;">
+                VIEW ON EXPLORER →
+            </a>
+            
+            <p style="color: #008F11; margin-top: 30px; font-size: 12px;">
+                You received this because you're subscribed to Whalers on the Moon alerts.
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return send_email(to_email, subject, html_content)
+
+
+async def send_alerts_to_subscribers(transaction: dict):
+    """Send whale alert to all subscribers"""
+    try:
+        subscribers = await db.subscriptions.find({}, {"_id": 0, "email": 1}).to_list(length=1000)
+        
+        for sub in subscribers:
+            send_whale_alert_email(sub['email'], transaction)
+            await asyncio.sleep(0.1)  # Rate limiting
+            
+        logger.info(f"Sent whale alerts to {len(subscribers)} subscribers")
+        
+    except Exception as e:
+        logger.error(f"Error sending alerts: {e}")
 
 
 # ============== Models ==============
@@ -393,7 +507,7 @@ async def get_whale_transactions(network: Optional[str] = None):
 
 
 @api_router.post("/subscribe", response_model=EmailSubscription)
-async def subscribe_to_alerts(input: EmailSubscriptionCreate):
+async def subscribe_to_alerts(input: EmailSubscriptionCreate, background_tasks: BackgroundTasks):
     """Subscribe an email address for whale alerts"""
     # Check if email already exists
     existing = await db.subscriptions.find_one({"email": input.email}, {"_id": 0})
@@ -405,6 +519,9 @@ async def subscribe_to_alerts(input: EmailSubscriptionCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     
     await db.subscriptions.insert_one(doc)
+    
+    # Send welcome email in background
+    background_tasks.add_task(send_welcome_email, input.email)
     
     logger.info(f"New subscription: {input.email}")
     return subscription
@@ -433,7 +550,8 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "helius_configured": bool(HELIUS_API_KEY),
-        "covalent_configured": bool(COVALENT_API_KEY)
+        "covalent_configured": bool(COVALENT_API_KEY),
+        "sendgrid_configured": bool(SENDGRID_API_KEY and SENDER_EMAIL)
     }
 
 
