@@ -7,7 +7,25 @@ import { ExternalLink, Bell, Waves, RefreshCw, Volume2, VolumeX, Settings, X } f
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 const DEFAULT_REFRESH_INTERVAL = 30000; // 30 seconds
-const DEFAULT_THRESHOLD = 100000; // $100,000 CAD
+const DEFAULT_THRESHOLD = 100000; // $100,000
+const DEFAULT_CURRENCY = "CAD";
+
+// Currency conversion rates (approximate, relative to USD)
+const CURRENCY_RATES = {
+  USD: 1,
+  CAD: 1.38,
+  EUR: 0.92,
+  GBP: 0.79,
+  AUD: 1.53,
+};
+
+const CURRENCY_SYMBOLS = {
+  USD: "$",
+  CAD: "$",
+  EUR: "€",
+  GBP: "£",
+  AUD: "$",
+};
 
 // Notification sound (base64 encoded short beep)
 const NOTIFICATION_SOUND = "data:audio/wav;base64,UklGRl9vT19LRUVQAFdBVkVmbXQgEAAAAAEAAQBBIgAAQCIAAQAIAGRhdGEAAPA/AAAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/";
@@ -22,7 +40,23 @@ const ASCII_WHALE = `
     |||||
 `;
 
-// Format currency to CAD
+// Format currency dynamically
+const formatCurrency = (amount, currency = "CAD") => {
+  const symbol = CURRENCY_SYMBOLS[currency] || "$";
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+  return `${symbol}${formatted}`;
+};
+
+// Convert USD to target currency
+const convertFromUSD = (usdAmount, targetCurrency) => {
+  const rate = CURRENCY_RATES[targetCurrency] || 1;
+  return usdAmount * rate;
+};
+
+// Format currency to CAD (legacy, kept for compatibility)
 const formatCAD = (amount) => {
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
@@ -137,22 +171,24 @@ const SubscribeModal = ({ isOpen, onClose }) => {
 };
 
 // Settings Modal Component
-const SettingsModal = ({ isOpen, onClose, threshold, setThreshold, refreshInterval, setRefreshInterval }) => {
+const SettingsModal = ({ isOpen, onClose, threshold, setThreshold, refreshInterval, setRefreshInterval, currency, setCurrency }) => {
   const [tempThreshold, setTempThreshold] = useState(threshold);
   const [tempInterval, setTempInterval] = useState(refreshInterval / 1000); // Convert to seconds
+  const [tempCurrency, setTempCurrency] = useState(currency);
 
   const handleSave = () => {
     setThreshold(tempThreshold);
     setRefreshInterval(tempInterval * 1000); // Convert back to ms
+    setCurrency(tempCurrency);
     onClose();
   };
 
   const thresholdOptions = [
-    { value: 50000, label: "$50K" },
-    { value: 100000, label: "$100K" },
-    { value: 250000, label: "$250K" },
-    { value: 500000, label: "$500K" },
-    { value: 1000000, label: "$1M" },
+    { value: 50000, label: `${CURRENCY_SYMBOLS[tempCurrency]}50K` },
+    { value: 100000, label: `${CURRENCY_SYMBOLS[tempCurrency]}100K` },
+    { value: 250000, label: `${CURRENCY_SYMBOLS[tempCurrency]}250K` },
+    { value: 500000, label: `${CURRENCY_SYMBOLS[tempCurrency]}500K` },
+    { value: 1000000, label: `${CURRENCY_SYMBOLS[tempCurrency]}1M` },
   ];
 
   const intervalOptions = [
@@ -161,6 +197,14 @@ const SettingsModal = ({ isOpen, onClose, threshold, setThreshold, refreshInterv
     { value: 30, label: "30s" },
     { value: 60, label: "1min" },
     { value: 120, label: "2min" },
+  ];
+
+  const currencyOptions = [
+    { value: "USD", label: "USD $" },
+    { value: "CAD", label: "CAD $" },
+    { value: "EUR", label: "EUR €" },
+    { value: "GBP", label: "GBP £" },
+    { value: "AUD", label: "AUD $" },
   ];
 
   if (!isOpen) return null;
@@ -176,7 +220,24 @@ const SettingsModal = ({ isOpen, onClose, threshold, setThreshold, refreshInterv
         <p className="modal-subtitle">Configure your whale tracker preferences</p>
         
         <div className="settings-group">
-          <label className="settings-label">WHALE THRESHOLD (CAD)</label>
+          <label className="settings-label">DISPLAY CURRENCY</label>
+          <div className="settings-options">
+            {currencyOptions.map((opt) => (
+              <button
+                key={opt.value}
+                className={`settings-option ${tempCurrency === opt.value ? 'active' : ''}`}
+                onClick={() => setTempCurrency(opt.value)}
+                data-testid={`currency-${opt.value}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="settings-hint">Primary currency for displaying amounts</p>
+        </div>
+        
+        <div className="settings-group">
+          <label className="settings-label">WHALE THRESHOLD ({tempCurrency})</label>
           <div className="settings-options">
             {thresholdOptions.map((opt) => (
               <button
@@ -222,7 +283,10 @@ const SettingsModal = ({ isOpen, onClose, threshold, setThreshold, refreshInterv
 };
 
 // Transaction Row Component
-const TransactionRow = ({ transaction, isNew }) => {
+const TransactionRow = ({ transaction, isNew, currency }) => {
+  // Convert amount to selected currency
+  const amountInCurrency = convertFromUSD(transaction.amount_usd, currency);
+  
   return (
     <div 
       className={`transaction-row ${isNew ? 'new-transaction' : ''}`} 
@@ -248,8 +312,8 @@ const TransactionRow = ({ transaction, isNew }) => {
       </div>
       
       <div className="amount-info">
-        <div className="amount-cad" data-testid={`amount-cad-${transaction.signature.slice(0, 8)}`}>
-          {formatCAD(transaction.amount_cad)}
+        <div className="amount-cad" data-testid={`amount-${transaction.signature.slice(0, 8)}`}>
+          {formatCurrency(amountInCurrency, currency)}
         </div>
         <div className="amount-usd">
           {formatUSD(transaction.amount_usd)} USD
@@ -286,6 +350,7 @@ const Dashboard = () => {
   const [newTransactionIds, setNewTransactionIds] = useState(new Set());
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
   const [refreshInterval, setRefreshInterval] = useState(DEFAULT_REFRESH_INTERVAL);
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   
   const previousTransactionsRef = useRef([]);
   const audioRef = useRef(null);
@@ -400,15 +465,18 @@ const Dashboard = () => {
     };
   }, [fetchTransactions, refreshInterval]);
 
-  // Filter transactions by threshold
-  const thresholdFilteredTxs = transactions.filter(tx => tx.amount_cad >= threshold);
+  // Filter transactions by threshold (convert USD to selected currency for comparison)
+  const thresholdFilteredTxs = transactions.filter(tx => {
+    const amountInCurrency = convertFromUSD(tx.amount_usd, currency);
+    return amountInCurrency >= threshold;
+  });
   
-  // Calculate stats from threshold-filtered transactions
-  const totalVolume = thresholdFilteredTxs.reduce((sum, tx) => sum + tx.amount_cad, 0);
+  // Calculate stats from threshold-filtered transactions (in selected currency)
+  const totalVolume = thresholdFilteredTxs.reduce((sum, tx) => sum + convertFromUSD(tx.amount_usd, currency), 0);
   const solanaCount = thresholdFilteredTxs.filter(tx => tx.network === "solana").length;
   const baseCount = thresholdFilteredTxs.filter(tx => tx.network === "base").length;
   const largestTx = thresholdFilteredTxs.length > 0 
-    ? Math.max(...thresholdFilteredTxs.map(tx => tx.amount_cad))
+    ? Math.max(...thresholdFilteredTxs.map(tx => convertFromUSD(tx.amount_usd, currency)))
     : 0;
 
   // Apply network filter on top of threshold filter
@@ -474,12 +542,12 @@ const Dashboard = () => {
         {/* Stats Bar */}
         <div className="stats-bar" data-testid="stats-bar">
           <div className="stat-card">
-            <div className="stat-label">TOTAL VOLUME</div>
-            <div className="stat-value" data-testid="total-volume">{formatCAD(totalVolume)}</div>
+            <div className="stat-label">TOTAL VOLUME ({currency})</div>
+            <div className="stat-value" data-testid="total-volume">{formatCurrency(totalVolume, currency)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">LARGEST MOVE</div>
-            <div className="stat-value" data-testid="largest-move">{formatCAD(largestTx)}</div>
+            <div className="stat-value" data-testid="largest-move">{formatCurrency(largestTx, currency)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">SOLANA TXS</div>
@@ -562,7 +630,7 @@ const Dashboard = () => {
                 </pre>
                 <p className="empty-text">NO WHALE ACTIVITY DETECTED</p>
                 <p className="empty-text" style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
-                  MONITORING FOR TRANSACTIONS &gt; ${formatCAD(threshold).replace('$', '')}
+                  MONITORING FOR TRANSACTIONS &gt; {formatCurrency(threshold, currency)}
                 </p>
               </div>
             ) : (
@@ -571,6 +639,7 @@ const Dashboard = () => {
                   key={tx.id || tx.signature} 
                   transaction={tx} 
                   isNew={newTransactionIds.has(tx.signature)}
+                  currency={currency}
                 />
               ))
             )}
@@ -580,7 +649,7 @@ const Dashboard = () => {
         {/* Footer */}
         <footer className="terminal-footer">
           <p>WHALERS ON THE MOON v1.0 | TRACKING SOLANA & BASE NETWORKS</p>
-          <p>THRESHOLD: {formatCAD(threshold)} | AUTO-REFRESH: {refreshInterval / 1000}s</p>
+          <p>THRESHOLD: {formatCurrency(threshold, currency)} {currency} | AUTO-REFRESH: {refreshInterval / 1000}s</p>
         </footer>
       </main>
 
@@ -598,6 +667,8 @@ const Dashboard = () => {
         setThreshold={setThreshold}
         refreshInterval={refreshInterval}
         setRefreshInterval={setRefreshInterval}
+        currency={currency}
+        setCurrency={setCurrency}
       />
     </div>
   );
