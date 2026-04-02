@@ -10,6 +10,33 @@ const DEFAULT_REFRESH_INTERVAL = 30000; // 30 seconds
 const DEFAULT_THRESHOLD = 100000; // $100,000
 const DEFAULT_CURRENCY = "CAD";
 
+// Load settings from localStorage
+const loadSettings = () => {
+  try {
+    const saved = localStorage.getItem('whalerSettings');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load settings:', e);
+  }
+  return {
+    threshold: DEFAULT_THRESHOLD,
+    refreshInterval: DEFAULT_REFRESH_INTERVAL,
+    currency: DEFAULT_CURRENCY,
+    soundEnabled: true,
+  };
+};
+
+// Save settings to localStorage
+const saveSettings = (settings) => {
+  try {
+    localStorage.setItem('whalerSettings', JSON.stringify(settings));
+  } catch (e) {
+    console.error('Failed to save settings:', e);
+  }
+};
+
 // Currency conversion rates (approximate, relative to USD)
 const CURRENCY_RATES = {
   USD: 1,
@@ -338,6 +365,9 @@ const TransactionRow = ({ transaction, isNew, currency }) => {
 
 // Main Dashboard Component
 const Dashboard = () => {
+  // Load initial settings from localStorage
+  const initialSettings = loadSettings();
+  
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -346,15 +376,25 @@ const Dashboard = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(initialSettings.soundEnabled);
   const [newTransactionIds, setNewTransactionIds] = useState(new Set());
-  const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
-  const [refreshInterval, setRefreshInterval] = useState(DEFAULT_REFRESH_INTERVAL);
-  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
+  const [threshold, setThreshold] = useState(initialSettings.threshold);
+  const [refreshInterval, setRefreshInterval] = useState(initialSettings.refreshInterval);
+  const [currency, setCurrency] = useState(initialSettings.currency);
   
   const previousTransactionsRef = useRef([]);
   const audioRef = useRef(null);
   const intervalRef = useRef(null);
+
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    saveSettings({
+      threshold,
+      refreshInterval,
+      currency,
+      soundEnabled,
+    });
+  }, [threshold, refreshInterval, currency, soundEnabled]);
 
   // Initialize audio
   useEffect(() => {
