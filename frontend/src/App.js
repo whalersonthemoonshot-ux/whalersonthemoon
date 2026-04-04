@@ -11,7 +11,7 @@ import "./ConnectTelegramPage.css";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 const DEFAULT_REFRESH_INTERVAL = 30000; // 30 seconds
-const DEFAULT_THRESHOLD = 100000; // $100,000
+const DEFAULT_THRESHOLD = 100; // $100 minimum - show all significant transactions
 const DEFAULT_CURRENCY = "CAD";
 
 // Load settings from localStorage

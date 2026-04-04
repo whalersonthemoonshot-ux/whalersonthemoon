@@ -591,43 +591,50 @@ async def get_whale_transactions(network: Optional[str] = None):
     """
     Get whale transactions from Solana and/or Base networks.
     Filter by network: 'solana', 'base', or None for all.
+    Returns REAL transactions from MongoDB (fetched by background worker).
     """
+    # Build query
+    query = {}
+    if network in ["solana", "base"]:
+        query["network"] = network
+    
+    # Fetch from MongoDB - real transactions stored by whale_fetcher
+    cursor = db.whale_transactions.find(query, {"_id": 0}).sort("timestamp", -1).limit(50)
+    stored_txs = await cursor.to_list(length=50)
+    
+    # Convert to WhaleTransaction objects
     all_transactions = []
-    networks_fetched = []
+    for tx in stored_txs:
+        try:
+            # Handle timestamp
+            ts = tx.get("timestamp")
+            if isinstance(ts, str):
+                ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            
+            all_transactions.append(WhaleTransaction(
+                signature=tx.get("signature", ""),
+                network=tx.get("network", "solana"),
+                token_name=tx.get("token_name", "Unknown"),
+                token_symbol=tx.get("token_symbol", "???"),
+                amount_usd=tx.get("amount_usd", 0),
+                amount_cad=tx.get("amount_cad", 0),
+                from_address=tx.get("from_address", ""),
+                to_address=tx.get("to_address", ""),
+                timestamp=ts if ts else datetime.now(timezone.utc),
+                explorer_url=tx.get("explorer_url", ""),
+                transaction_type=tx.get("transaction_type", "transfer")
+            ))
+        except Exception as e:
+            logger.error(f"Error parsing transaction: {e}")
     
-    # Fetch from both networks in parallel for better performance
-    if network is None:
-        # Fetch both in parallel
-        solana_task = fetch_solana_whale_transactions()
-        base_task = fetch_base_whale_transactions()
-        
-        solana_txs, base_txs = await asyncio.gather(solana_task, base_task)
-        
-        if solana_txs:
-            all_transactions.extend(solana_txs)
-            networks_fetched.append("solana")
-        if base_txs:
-            all_transactions.extend(base_txs)
-            networks_fetched.append("base")
-    elif network == "solana":
-        solana_txs = await fetch_solana_whale_transactions()
-        all_transactions.extend(solana_txs)
-        if solana_txs:
-            networks_fetched.append("solana")
-    elif network == "base":
-        base_txs = await fetch_base_whale_transactions()
-        all_transactions.extend(base_txs)
-        if base_txs:
-            networks_fetched.append("base")
-    
-    # Sort by timestamp (most recent first)
-    all_transactions.sort(key=lambda x: x.timestamp, reverse=True)
+    # If no real transactions yet, show a message (don't use fake data)
+    networks_found = list(set(tx.network for tx in all_transactions))
     
     return TransactionsResponse(
         transactions=all_transactions,
         total_count=len(all_transactions),
         last_updated=datetime.now(timezone.utc),
-        networks=networks_fetched if networks_fetched else ["solana", "base"]
+        networks=networks_found if networks_found else ["solana", "base"]
     )
 
 
