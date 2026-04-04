@@ -39,8 +39,8 @@ telegram_bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 # Subscription tiers (prices in USD)
 SUBSCRIPTION_TIERS = {
     "free": {"price": 0.0, "name": "Free", "features": ["Website access", "30s refresh"]},
-    "pro": {"price": 10.0, "name": "Pro", "features": ["Instant Telegram alerts", "15s refresh", "Email alerts"]},
-    "whale": {"price": 25.0, "name": "Whale", "features": ["All Pro features", "Custom thresholds", "Priority support", "API access"]}
+    "pro": {"price": 5.0, "name": "Pro", "features": ["Instant Telegram alerts", "15s refresh", "Email alerts"]},
+    "whale": {"price": 10.0, "name": "Whale", "features": ["All Pro features", "Custom thresholds", "Priority support", "API access"]}
 }
 
 # Whale threshold in CAD

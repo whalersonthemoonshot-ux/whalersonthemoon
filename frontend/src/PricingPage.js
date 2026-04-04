@@ -134,7 +134,7 @@ const PricingPage = () => {
     {
       id: "pro",
       name: "Pro",
-      price: "$10",
+      price: "$5",
       period: "/month",
       description: "For serious traders",
       features: [
@@ -151,7 +151,7 @@ const PricingPage = () => {
     {
       id: "whale",
       name: "Whale",
-      price: "$25",
+      price: "$10",
       period: "/month",
       description: "Maximum alpha",
       features: [
