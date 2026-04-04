@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, Request
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,13 +6,15 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timezone
 import httpx
 import asyncio
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
+from telegram import Bot
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -28,6 +30,18 @@ COVALENT_API_KEY = os.environ.get('COVALENT_API_KEY', '')
 USD_TO_CAD_RATE = float(os.environ.get('USD_TO_CAD_RATE', '1.38'))
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', '')
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', '')
+
+# Initialize Telegram Bot
+telegram_bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
+
+# Subscription tiers (prices in USD)
+SUBSCRIPTION_TIERS = {
+    "free": {"price": 0.0, "name": "Free", "features": ["Website access", "30s refresh"]},
+    "pro": {"price": 10.0, "name": "Pro", "features": ["Instant Telegram alerts", "15s refresh", "Email alerts"]},
+    "whale": {"price": 25.0, "name": "Whale", "features": ["All Pro features", "Custom thresholds", "Priority support", "API access"]}
+}
 
 # Whale threshold in CAD
 WHALE_THRESHOLD_CAD = 100000
@@ -142,12 +156,24 @@ def send_whale_alert_email(to_email: str, transaction: dict) -> bool:
 
 
 async def send_alerts_to_subscribers(transaction: dict):
-    """Send whale alert to all subscribers"""
+    """Send whale alert to all subscribers (email + Telegram for paid users)"""
     try:
-        subscribers = await db.subscriptions.find({}, {"_id": 0, "email": 1}).to_list(length=1000)
+        # Get all subscribers with their tier info
+        subscribers = await db.subscriptions.find({}, {"_id": 0}).to_list(length=1000)
         
         for sub in subscribers:
-            send_whale_alert_email(sub['email'], transaction)
+            email = sub.get('email')
+            tier = sub.get('tier', 'free')
+            telegram_chat_id = sub.get('telegram_chat_id')
+            
+            # Send email to all subscribers
+            if email:
+                send_whale_alert_email(email, transaction)
+            
+            # Send Telegram only to paid subscribers (pro or whale)
+            if tier in ['pro', 'whale'] and telegram_chat_id:
+                await send_telegram_alert(telegram_chat_id, transaction)
+            
             await asyncio.sleep(0.1)  # Rate limiting
             
         logger.info(f"Sent whale alerts to {len(subscribers)} subscribers")
@@ -156,17 +182,116 @@ async def send_alerts_to_subscribers(transaction: dict):
         logger.error(f"Error sending alerts: {e}")
 
 
+# ============== Telegram Service ==============
+
+async def send_telegram_alert(chat_id: int, transaction: dict) -> bool:
+    """Send whale alert via Telegram"""
+    if not telegram_bot:
+        logger.warning("Telegram bot not configured")
+        return False
+    
+    try:
+        network_emoji = "🟣" if transaction['network'] == "solana" else "🔵"
+        
+        message = f"""
+🐋 *WHALE ALERT!*
+
+{network_emoji} *{transaction['network'].upper()}*
+Token: *{transaction['token_name']}* ({transaction['token_symbol']})
+Amount: *${transaction['amount_cad']:,.0f} CAD*
+USD: ${transaction['amount_usd']:,.0f}
+Type: {transaction['transaction_type'].upper()}
+
+From: `{transaction['from_address']}`
+To: `{transaction['to_address']}`
+
+[View on Explorer]({transaction['explorer_url']})
+"""
+        
+        await telegram_bot.send_message(
+            chat_id=chat_id,
+            text=message,
+            parse_mode='Markdown',
+            disable_web_page_preview=True
+        )
+        logger.info(f"Telegram alert sent to {chat_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to send Telegram alert: {e}")
+        return False
+
+
+async def send_telegram_welcome(chat_id: int, tier: str) -> bool:
+    """Send welcome message to new Telegram subscriber"""
+    if not telegram_bot:
+        return False
+    
+    try:
+        message = f"""
+🐋 *Welcome to Whalers on the Moon!*
+
+Your Telegram is now connected!
+
+*Your Plan:* {SUBSCRIPTION_TIERS[tier]['name']}
+
+You'll receive instant alerts here when whales make moves over $100K CAD on Solana and Base.
+
+Commands:
+/status - Check your subscription
+/help - Get help
+
+Stay vigilant! 🌙
+"""
+        await telegram_bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send Telegram welcome: {e}")
+        return False
+
+
 # ============== Models ==============
 
 class EmailSubscription(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: EmailStr
+    tier: str = Field(default="free")
+    telegram_chat_id: Optional[int] = None
+    stripe_customer_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EmailSubscriptionCreate(BaseModel):
     email: EmailStr
+
+
+class SubscriptionUpgrade(BaseModel):
+    email: EmailStr
+    tier: str
+    origin_url: str
+
+
+class TelegramConnect(BaseModel):
+    email: EmailStr
+    telegram_chat_id: int
+
+
+class CheckoutRequest(BaseModel):
+    email: EmailStr
+    tier: str
+    origin_url: str
+
+
+class PaymentTransaction(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    tier: str
+    amount: float
+    currency: str = "usd"
+    session_id: str
+    payment_status: str = "pending"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class WhaleTransaction(BaseModel):
@@ -551,8 +676,189 @@ async def health_check():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "helius_configured": bool(HELIUS_API_KEY),
         "covalent_configured": bool(COVALENT_API_KEY),
-        "sendgrid_configured": bool(SENDGRID_API_KEY and SENDER_EMAIL)
+        "sendgrid_configured": bool(SENDGRID_API_KEY and SENDER_EMAIL),
+        "telegram_configured": bool(TELEGRAM_BOT_TOKEN),
+        "stripe_configured": bool(STRIPE_API_KEY)
     }
+
+
+# ============== Subscription & Payment Endpoints ==============
+
+@api_router.get("/tiers")
+async def get_subscription_tiers():
+    """Get available subscription tiers"""
+    return SUBSCRIPTION_TIERS
+
+
+@api_router.get("/subscription/{email}")
+async def get_user_subscription(email: str):
+    """Get user's current subscription details"""
+    sub = await db.subscriptions.find_one({"email": email}, {"_id": 0})
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    return sub
+
+
+@api_router.post("/connect-telegram")
+async def connect_telegram(input: TelegramConnect, background_tasks: BackgroundTasks):
+    """Connect Telegram to user's subscription"""
+    sub = await db.subscriptions.find_one({"email": input.email})
+    if not sub:
+        raise HTTPException(status_code=404, detail="Email not found. Please subscribe first.")
+    
+    # Update subscription with Telegram chat ID
+    await db.subscriptions.update_one(
+        {"email": input.email},
+        {"$set": {"telegram_chat_id": input.telegram_chat_id}}
+    )
+    
+    # Send welcome message
+    tier = sub.get('tier', 'free')
+    background_tasks.add_task(send_telegram_welcome, input.telegram_chat_id, tier)
+    
+    return {"status": "connected", "message": "Telegram connected successfully"}
+
+
+@api_router.post("/checkout/create")
+async def create_checkout_session(request: Request, input: CheckoutRequest):
+    """Create a Stripe checkout session for subscription upgrade"""
+    if input.tier not in ['pro', 'whale']:
+        raise HTTPException(status_code=400, detail="Invalid tier. Choose 'pro' or 'whale'")
+    
+    # Check if user exists
+    sub = await db.subscriptions.find_one({"email": input.email})
+    if not sub:
+        raise HTTPException(status_code=404, detail="Please subscribe with your email first")
+    
+    # Get tier price
+    amount = SUBSCRIPTION_TIERS[input.tier]['price']
+    
+    # Create Stripe checkout
+    host_url = str(request.base_url).rstrip('/')
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    success_url = f"{input.origin_url}/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{input.origin_url}/"
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=amount,
+        currency="usd",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "email": input.email,
+            "tier": input.tier
+        }
+    )
+    
+    session = await stripe_checkout.create_checkout_session(checkout_request)
+    
+    # Create payment transaction record
+    payment_doc = {
+        "id": str(uuid.uuid4()),
+        "email": input.email,
+        "tier": input.tier,
+        "amount": amount,
+        "currency": "usd",
+        "session_id": session.session_id,
+        "payment_status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.payment_transactions.insert_one(payment_doc)
+    
+    logger.info(f"Checkout session created for {input.email} - {input.tier}")
+    
+    return {"url": session.url, "session_id": session.session_id}
+
+
+@api_router.get("/checkout/status/{session_id}")
+async def get_checkout_status(request: Request, session_id: str):
+    """Check payment status and update subscription if paid"""
+    # Get payment transaction
+    payment = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment session not found")
+    
+    # If already processed, return current status
+    if payment.get('payment_status') == 'paid':
+        return {"status": "complete", "payment_status": "paid", "tier": payment.get('tier')}
+    
+    # Check with Stripe
+    host_url = str(request.base_url).rstrip('/')
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    
+    try:
+        status = await stripe_checkout.get_checkout_status(session_id)
+        
+        if status.payment_status == 'paid':
+            # Update payment record
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {"payment_status": "paid"}}
+            )
+            
+            # Upgrade user subscription
+            email = payment.get('email')
+            tier = payment.get('tier')
+            
+            await db.subscriptions.update_one(
+                {"email": email},
+                {"$set": {"tier": tier}}
+            )
+            
+            logger.info(f"Subscription upgraded: {email} -> {tier}")
+            
+            return {"status": "complete", "payment_status": "paid", "tier": tier}
+        
+        return {"status": status.status, "payment_status": status.payment_status}
+        
+    except Exception as e:
+        logger.error(f"Error checking payment status: {e}")
+        return {"status": "error", "payment_status": "unknown"}
+
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    try:
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature")
+        
+        host_url = str(request.base_url).rstrip('/')
+        webhook_url = f"{host_url}/api/webhook/stripe"
+        stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+        
+        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        if webhook_response.payment_status == 'paid':
+            session_id = webhook_response.session_id
+            metadata = webhook_response.metadata
+            
+            email = metadata.get('email')
+            tier = metadata.get('tier')
+            
+            if email and tier:
+                # Update payment and subscription
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {"$set": {"payment_status": "paid"}}
+                )
+                
+                await db.subscriptions.update_one(
+                    {"email": email},
+                    {"$set": {"tier": tier}}
+                )
+                
+                logger.info(f"Webhook: Subscription upgraded {email} -> {tier}")
+        
+        return {"status": "ok"}
+        
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"status": "error"}
 
 
 # Include the router in the main app

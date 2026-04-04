@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { ExternalLink, Bell, Waves, RefreshCw, Volume2, VolumeX, Settings, X } from "lucide-react";
+import { ExternalLink, Bell, Waves, RefreshCw, Volume2, VolumeX, Settings, X, Zap } from "lucide-react";
+import PricingPage from "./PricingPage";
+import "./PricingPage.css";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -367,6 +369,7 @@ const TransactionRow = ({ transaction, isNew, currency }) => {
 const Dashboard = () => {
   // Load initial settings from localStorage
   const initialSettings = loadSettings();
+  const navigate = useNavigate();
   
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -548,6 +551,16 @@ const Dashboard = () => {
           
           <div className="header-actions">
             <button
+              className="upgrade-btn"
+              onClick={() => navigate("/pricing")}
+              data-testid="upgrade-btn"
+              title="Upgrade for Telegram Alerts"
+            >
+              <Zap size={18} />
+              UPGRADE
+            </button>
+            
+            <button
               className="settings-btn"
               onClick={() => setShowSettingsModal(true)}
               data-testid="settings-btn"
@@ -719,6 +732,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/success" element={<PricingPage />} />
       </Routes>
     </BrowserRouter>
   );
