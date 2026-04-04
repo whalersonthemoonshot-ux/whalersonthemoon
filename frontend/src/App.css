@@ -53,6 +53,43 @@ body {
   position: relative;
 }
 
+/* Ship Banner */
+.ship-banner {
+  background-color: var(--terminal-bg);
+  text-align: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(0, 255, 65, 0.2);
+  overflow: hidden;
+}
+
+.ascii-ship {
+  font-size: 0.5rem;
+  line-height: 1.1;
+  white-space: pre;
+  color: var(--terminal-green-dim);
+  margin: 0;
+  display: inline-block;
+  animation: sailShip 20s linear infinite;
+}
+
+@keyframes sailShip {
+  0% {
+    transform: translateX(-5%);
+  }
+  50% {
+    transform: translateX(5%);
+  }
+  100% {
+    transform: translateX(-5%);
+  }
+}
+
+@media (max-width: 768px) {
+  .ship-banner {
+    display: none;
+  }
+}
+
 /* Header */
 .terminal-header {
   background-color: var(--terminal-bg);

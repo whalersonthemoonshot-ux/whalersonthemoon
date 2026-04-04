@@ -71,6 +71,18 @@ const ASCII_WHALE = `
     |||||
 `;
 
+// ASCII Art Whaling Ship
+const ASCII_SHIP = `
+                                        |    |    |                 
+                                       )_)  )_)  )_)              
+                                      )___))___))___)\\            
+                                     )____)____)_____)\\\\          
+                                   _____|____|____|____\\\\\\__      
+                          ~~~~~~~~\\                   /~~~~~~~~    
+                            ~~~~~~\\_________________/~~~~~~       
+                               ~~~~      \\___/      ~~~~          
+`;
+
 // Format currency dynamically
 const formatCurrency = (amount, currency = "CAD") => {
   const symbol = CURRENCY_SYMBOLS[currency] || "$";
@@ -533,6 +545,19 @@ const Dashboard = () => {
     <div className="App">
       {/* Scanline Overlay */}
       <div className="scanline-overlay" />
+
+      {/* Ship Banner */}
+      <div className="ship-banner" data-testid="ship-banner">
+        <pre className="ascii-ship">
+{`                                        |    |    |                 
+                                       )_)  )_)  )_)              
+                                      )___))___))___)\\            
+                                     )____)____)_____)\\\\          
+                                   _____|____|____|____\\\\\\__      
+                          ~~~~~~~~\\                   /~~~~~~~~    
+                            ~~~~~~\\_________________/~~~~~~       `}
+        </pre>
+      </div>
 
       {/* Header */}
       <header className="terminal-header">
