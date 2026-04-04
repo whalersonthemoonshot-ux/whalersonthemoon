@@ -5,6 +5,8 @@ import axios from "axios";
 import { ExternalLink, Bell, Waves, RefreshCw, Volume2, VolumeX, Settings, X, Zap } from "lucide-react";
 import PricingPage from "./PricingPage";
 import "./PricingPage.css";
+import ConnectTelegramPage from "./ConnectTelegramPage";
+import "./ConnectTelegramPage.css";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -734,6 +736,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/success" element={<PricingPage />} />
+        <Route path="/connect-telegram" element={<ConnectTelegramPage />} />
       </Routes>
     </BrowserRouter>
   );

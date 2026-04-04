@@ -174,11 +174,16 @@ const PricingPage = () => {
           <div className="success-icon">🐋</div>
           <h1>Welcome to {currentTier.charAt(0).toUpperCase() + currentTier.slice(1)}!</h1>
           <p>Your subscription is now active.</p>
-          <p className="success-hint">Connect your Telegram to receive instant alerts!</p>
-          <button onClick={() => navigate("/")} className="back-btn">
-            <ArrowLeft size={18} />
-            Back to Dashboard
-          </button>
+          
+          <div className="success-actions">
+            <button onClick={() => navigate("/connect-telegram")} className="connect-telegram-btn">
+              📱 Connect Telegram for Instant Alerts
+            </button>
+            <button onClick={() => navigate("/")} className="back-btn">
+              <ArrowLeft size={18} />
+              Back to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );

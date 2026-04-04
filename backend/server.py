@@ -861,6 +861,98 @@ async def stripe_webhook(request: Request):
         return {"status": "error"}
 
 
+# ============== Telegram Connect Endpoints ==============
+
+@api_router.post("/telegram/connect")
+async def connect_telegram_by_code(email: str, code: str):
+    """Connect Telegram using verification code"""
+    # Find pending connection
+    pending = await db.telegram_pending.find_one({"code": code.upper()}, {"_id": 0})
+    if not pending:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+    
+    # Find subscription
+    sub = await db.subscriptions.find_one({"email": email})
+    if not sub:
+        raise HTTPException(status_code=404, detail="Email not found")
+    
+    # Update subscription with chat_id
+    chat_id = pending.get("chat_id")
+    await db.subscriptions.update_one(
+        {"email": email},
+        {"$set": {"telegram_chat_id": chat_id}}
+    )
+    
+    # Delete pending connection
+    await db.telegram_pending.delete_one({"code": code.upper()})
+    
+    # Send confirmation via Telegram
+    tier = sub.get("tier", "free")
+    await send_telegram_welcome(chat_id, tier)
+    
+    return {"status": "connected", "message": "Telegram connected successfully!"}
+
+
+@api_router.get("/telegram/generate-code/{email}")
+async def generate_telegram_code(email: str):
+    """Generate a code for user to send to Telegram bot"""
+    import random
+    import string
+    
+    # Check subscription exists
+    sub = await db.subscriptions.find_one({"email": email})
+    if not sub:
+        raise HTTPException(status_code=404, detail="Please subscribe first")
+    
+    # Generate 6-char code
+    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    
+    # Store temporarily (expires in 10 min)
+    await db.telegram_codes.update_one(
+        {"email": email},
+        {"$set": {"code": code, "created_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    
+    return {
+        "code": code,
+        "bot_username": "Whalersonthemoonbot",
+        "instructions": f"Send this to @Whalersonthemoonbot: /connect {code}"
+    }
+
+
+@api_router.post("/telegram/verify-code")
+async def verify_telegram_code(code: str, chat_id: int):
+    """Called by Telegram bot to verify a connection code"""
+    # Find the code
+    code_doc = await db.telegram_codes.find_one({"code": code.upper()}, {"_id": 0})
+    if not code_doc:
+        return {"status": "error", "message": "Invalid or expired code"}
+    
+    email = code_doc.get("email")
+    
+    # Update subscription with chat_id
+    result = await db.subscriptions.update_one(
+        {"email": email},
+        {"$set": {"telegram_chat_id": chat_id}}
+    )
+    
+    if result.modified_count == 0:
+        return {"status": "error", "message": "Failed to connect"}
+    
+    # Delete the used code
+    await db.telegram_codes.delete_one({"code": code.upper()})
+    
+    # Get user tier
+    sub = await db.subscriptions.find_one({"email": email}, {"_id": 0})
+    tier = sub.get("tier", "free") if sub else "free"
+    
+    # Send welcome message
+    await send_telegram_welcome(chat_id, tier)
+    
+    return {"status": "success", "email": email, "tier": tier}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 

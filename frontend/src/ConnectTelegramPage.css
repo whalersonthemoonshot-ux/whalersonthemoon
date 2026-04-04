@@ -1,0 +1,212 @@
+/* Connect Telegram Page Styles */
+.connect-page {
+  min-height: 100vh;
+  background-color: #000;
+  color: #00FF41;
+  padding: 2rem;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  justify-content: center;
+}
+
+.connect-container {
+  max-width: 500px;
+  width: 100%;
+}
+
+.connect-header {
+  text-align: center;
+  margin: 2rem 0;
+}
+
+.connect-header h1 {
+  font-size: 1.5rem;
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 10px #00FF41;
+  margin: 1rem 0 0.5rem;
+}
+
+.connect-header p {
+  color: #008F11;
+  font-size: 0.875rem;
+}
+
+.telegram-icon {
+  color: #00FF41;
+}
+
+.connect-error {
+  background: rgba(255, 0, 60, 0.1);
+  border: 1px solid #FF003C;
+  color: #FF003C;
+  padding: 1rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.connect-step {
+  background: #050505;
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  padding: 2rem;
+  text-align: center;
+}
+
+.step-number {
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  color: #008F11;
+  margin-bottom: 0.5rem;
+}
+
+.connect-step h2 {
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+}
+
+.connect-step p {
+  font-size: 0.75rem;
+  color: #008F11;
+  margin-bottom: 1.5rem;
+}
+
+.connect-input {
+  width: 100%;
+  background: #000;
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  color: #00FF41;
+  padding: 0.875rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.connect-input:focus {
+  outline: none;
+  border-color: #00FF41;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+}
+
+.connect-btn {
+  width: 100%;
+  padding: 0.875rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.connect-btn.primary {
+  background: #00FF41;
+  color: #000;
+}
+
+.connect-btn.primary:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+}
+
+.connect-btn.telegram {
+  background: #0088cc;
+  color: #fff;
+}
+
+.connect-btn.telegram:hover {
+  box-shadow: 0 0 20px rgba(0, 136, 204, 0.5);
+}
+
+.connect-btn.secondary {
+  background: transparent;
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  color: #008F11;
+}
+
+.connect-btn.secondary:hover {
+  border-color: #00FF41;
+  color: #00FF41;
+}
+
+.connect-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.code-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: #000;
+  border: 2px solid #00FF41;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+
+.code-display .code {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 10px #00FF41;
+}
+
+.copy-btn {
+  background: transparent;
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  color: #00FF41;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.copy-btn:hover {
+  border-color: #00FF41;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+}
+
+.copy-btn.small {
+  padding: 0.25rem 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.625rem;
+}
+
+.command-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: #000;
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.command-display code {
+  font-size: 0.875rem;
+  color: #00FF41;
+}
+
+.connect-note {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(0, 255, 65, 0.1);
+}
+
+.connect-note p {
+  font-size: 0.625rem;
+  color: #008F11;
+  margin: 0.25rem 0;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
