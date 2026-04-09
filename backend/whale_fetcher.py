@@ -220,7 +220,7 @@ def parse_solana_tx(tx_data: dict, signature: str) -> dict:
 
 
 async def fetch_base_whales():
-    """Fetch large transactions from Base via Covalent"""
+    """Fetch large transactions from Base via Covalent with retry logic"""
     if not COVALENT_API_KEY:
         logger.warning("No Covalent API key")
         return []
@@ -228,68 +228,103 @@ async def fetch_base_whales():
     transactions = []
     auth_string = base64.b64encode(f"{COVALENT_API_KEY}:".encode()).decode()
     
-    async with httpx.AsyncClient(timeout=60.0) as http_client:
+    # Retry config
+    MAX_RETRIES = 3
+    BASE_TIMEOUT = 30.0
+    
+    async with httpx.AsyncClient() as http_client:
         for address in BASE_WHALE_ADDRESSES:
-            try:
-                logger.info(f"Fetching Base transactions for {address[:10]}...")
-                response = await http_client.get(
-                    f"https://api.covalenthq.com/v1/base-mainnet/address/{address}/transactions_v3/",
-                    headers={
-                        "Authorization": f"Basic {auth_string}",
-                        "Content-Type": "application/json"
-                    },
-                    params={"page-size": 30}
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"Covalent error: {response.status_code} - {response.text[:200]}")
-                    continue
-                
-                data = response.json()
-                items = data.get("data", {}).get("items", [])
-                logger.info(f"Got {len(items)} Base transactions")
-                
-                for item in items:
-                    tx_hash = item.get("tx_hash")
-                    if not tx_hash:
+            retry_count = 0
+            success = False
+            
+            while retry_count < MAX_RETRIES and not success:
+                try:
+                    # Exponential backoff timeout: 30s, 45s, 60s
+                    current_timeout = BASE_TIMEOUT * (1.5 ** retry_count)
+                    
+                    if retry_count > 0:
+                        # Wait before retry with exponential backoff: 2s, 4s, 8s
+                        wait_time = 2 ** retry_count
+                        logger.info(f"Retry {retry_count}/{MAX_RETRIES} for {address[:10]}... (waiting {wait_time}s)")
+                        await asyncio.sleep(wait_time)
+                    
+                    logger.info(f"Fetching Base transactions for {address[:10]}... (timeout: {current_timeout}s)")
+                    
+                    response = await http_client.get(
+                        f"https://api.covalenthq.com/v1/base-mainnet/address/{address}/transactions_v3/",
+                        headers={
+                            "Authorization": f"Basic {auth_string}",
+                            "Content-Type": "application/json"
+                        },
+                        params={"page-size": 30},
+                        timeout=current_timeout
+                    )
+                    
+                    if response.status_code == 429:
+                        # Rate limited - wait longer
+                        logger.warning(f"Covalent rate limited, waiting 30s...")
+                        await asyncio.sleep(30)
+                        retry_count += 1
                         continue
                     
-                    # Check if we already have this
-                    existing = await db.whale_transactions.find_one({"signature": tx_hash})
-                    if existing:
+                    if response.status_code != 200:
+                        logger.error(f"Covalent error: {response.status_code} - {response.text[:200]}")
+                        retry_count += 1
                         continue
                     
-                    # Get transaction value
-                    value_wei = int(item.get("value", 0) or 0)
-                    value_eth = value_wei / 1e18
-                    value_usd = value_eth * TOKEN_PRICES_USD.get("ETH", 3500)
+                    data = response.json()
+                    items = data.get("data", {}).get("items", [])
+                    logger.info(f"Got {len(items)} Base transactions")
+                    success = True
                     
-                    # Also check gas spent as indicator of complex swap
-                    gas_quote = float(item.get("gas_quote", 0) or 0)
-                    
-                    if value_usd >= WHALE_THRESHOLD_USD:
-                        from_addr = item.get("from_address", "")
-                        to_addr = item.get("to_address", "")
+                    for item in items:
+                        tx_hash = item.get("tx_hash")
+                        if not tx_hash:
+                            continue
                         
-                        whale_tx = {
-                            "signature": tx_hash,
-                            "network": "base",
-                            "token_name": "Ethereum",
-                            "token_symbol": "ETH",
-                            "amount_usd": round(value_usd, 2),
-                            "amount_cad": round(value_usd * USD_TO_CAD_RATE, 2),
-                            "from_address": f"{from_addr[:8]}...{from_addr[-4:]}" if from_addr else "",
-                            "to_address": f"{to_addr[:8]}...{to_addr[-4:]}" if to_addr else "",
-                            "timestamp": item.get("block_signed_at", datetime.now(timezone.utc).isoformat()),
-                            "explorer_url": f"https://basescan.org/tx/{tx_hash}",
-                            "transaction_type": "transfer",
-                            "fetched_at": datetime.now(timezone.utc).isoformat()
-                        }
-                        transactions.append(whale_tx)
-                        logger.info(f"Found Base whale: ${value_usd:,.0f} ETH")
+                        # Check if we already have this
+                        existing = await db.whale_transactions.find_one({"signature": tx_hash})
+                        if existing:
+                            continue
                         
-            except Exception as e:
-                logger.error(f"Error fetching Base: {e}")
+                        # Get transaction value
+                        value_wei = int(item.get("value", 0) or 0)
+                        value_eth = value_wei / 1e18
+                        value_usd = value_eth * TOKEN_PRICES_USD.get("ETH", 3500)
+                        
+                        if value_usd >= WHALE_THRESHOLD_USD:
+                            from_addr = item.get("from_address", "")
+                            to_addr = item.get("to_address", "")
+                            
+                            whale_tx = {
+                                "signature": tx_hash,
+                                "network": "base",
+                                "token_name": "Ethereum",
+                                "token_symbol": "ETH",
+                                "amount_usd": round(value_usd, 2),
+                                "amount_cad": round(value_usd * USD_TO_CAD_RATE, 2),
+                                "from_address": f"{from_addr[:8]}...{from_addr[-4:]}" if from_addr else "",
+                                "to_address": f"{to_addr[:8]}...{to_addr[-4:]}" if to_addr else "",
+                                "timestamp": item.get("block_signed_at", datetime.now(timezone.utc).isoformat()),
+                                "explorer_url": f"https://basescan.org/tx/{tx_hash}",
+                                "transaction_type": "transfer",
+                                "fetched_at": datetime.now(timezone.utc).isoformat()
+                            }
+                            transactions.append(whale_tx)
+                            logger.info(f"Found Base whale: ${value_usd:,.0f} ETH")
+                
+                except httpx.TimeoutException:
+                    retry_count += 1
+                    logger.warning(f"Covalent timeout for {address[:10]}... (attempt {retry_count}/{MAX_RETRIES})")
+                except httpx.ConnectError as e:
+                    retry_count += 1
+                    logger.warning(f"Covalent connection error: {e} (attempt {retry_count}/{MAX_RETRIES})")
+                except Exception as e:
+                    logger.error(f"Error fetching Base: {e}")
+                    retry_count += 1
+            
+            if not success:
+                logger.error(f"Failed to fetch Base transactions for {address[:10]} after {MAX_RETRIES} retries")
     
     return transactions
 

@@ -32,6 +32,25 @@ Build a real-time Whale Transaction Tracker for the Solana and Base networks cal
   - Footer links to all legal pages on main dashboard
   - Terminal-themed styling consistent with app
 
+- **Covalent API Reliability Improved**:
+  - Added retry logic with exponential backoff (3 retries)
+  - Timeout increases: 30s → 45s → 67.5s
+  - Wait times between retries: 2s → 4s → 8s
+  - Rate limit handling (429 responses)
+  - Better error logging
+
+- **App.js Refactored** (~785 lines → ~220 lines):
+  - Extracted `Header.js` - App header with buttons
+  - Extracted `ShipBanner.js` - ASCII whaling ship animation
+  - Extracted `StatsBar.js` - Stats cards component
+  - Extracted `NetworkTabs.js` - Network filter tabs
+  - Extracted `TransactionList.js` - Main transaction display
+  - Extracted `TransactionRow.js` - Individual transaction row
+  - Extracted `SubscribeModal.js` - Email subscription modal
+  - Extracted `SettingsModal.js` - Settings configuration modal
+  - Extracted `Footer.js` - Footer with legal links
+  - Extracted `utils.js` - Shared utilities and constants
+
 ### Previous Implementation
 - **Backend (FastAPI)**:
   - GET /api/transactions - Fetches whale transactions from MongoDB
@@ -63,7 +82,7 @@ Frontend (React)
 Backend (FastAPI)
     |
     +---> Helius API (Solana) ✓
-    +---> Covalent API (Base) ✓
+    +---> Covalent API (Base) ✓ (with retry logic)
     +---> MongoDB (transactions, subscriptions)
     +---> SendGrid (email alerts)
     +---> Stripe (payments)
@@ -73,6 +92,30 @@ Supervisor Processes:
     1. backend (FastAPI server)
     2. whale_fetcher (background data poller)
     3. telegram_bot (Telegram long polling)
+```
+
+## Component Structure (Post-Refactor)
+```
+/app/frontend/src/
+├── App.js                  # Main app with routing (~220 lines)
+├── App.css                 # Styles
+├── components/
+│   ├── utils.js            # Shared utilities & constants
+│   ├── Header.js           # App header
+│   ├── ShipBanner.js       # ASCII ship animation
+│   ├── StatsBar.js         # Stats cards
+│   ├── NetworkTabs.js      # Network filter
+│   ├── TransactionList.js  # Transaction display
+│   ├── TransactionRow.js   # Single transaction row
+│   ├── SubscribeModal.js   # Email subscription
+│   ├── SettingsModal.js    # Settings configuration
+│   └── Footer.js           # Footer with legal links
+├── PrivacyPolicy.js        # Legal page
+├── TermsOfService.js       # Legal page
+├── Disclaimer.js           # Legal page
+├── LegalPages.css          # Legal pages styling
+├── PricingPage.js          # Stripe checkout
+└── ConnectTelegramPage.js  # Telegram connect flow
 ```
 
 ## Tech Stack
@@ -95,25 +138,21 @@ Supervisor Processes:
 - [x] Telegram Bot integration
 - [x] Real on-chain data (Helius + Covalent)
 - [x] Legal pages (Privacy, Terms, Disclaimer)
+- [x] Covalent API retry logic
+- [x] Code refactoring (App.js → components)
 
 ### P1 - High Priority (Future)
 - [ ] WebSocket for real-time updates instead of polling
 - [ ] Historical data storage and charts
-- [ ] Improve Covalent API reliability (occasional timeouts)
 
 ### P2 - Nice to Have
-- [ ] Refactor App.js (~1000 lines → smaller components)
 - [ ] Transaction history export (CSV)
 - [ ] Mobile PWA support
+- [ ] Cookie consent banner (GDPR)
 
 ## Files Reference
 - `/app/backend/server.py` - Main FastAPI server
-- `/app/backend/whale_fetcher.py` - Background data poller
+- `/app/backend/whale_fetcher.py` - Background data poller (with retry logic)
 - `/app/backend/telegram_bot.py` - Telegram bot script
-- `/app/frontend/src/App.js` - Main dashboard
-- `/app/frontend/src/PricingPage.js` - Stripe checkout UI
-- `/app/frontend/src/ConnectTelegramPage.js` - Telegram connect UI
-- `/app/frontend/src/PrivacyPolicy.js` - Privacy Policy page
-- `/app/frontend/src/TermsOfService.js` - Terms of Service page
-- `/app/frontend/src/Disclaimer.js` - Disclaimer page
-- `/app/frontend/src/LegalPages.css` - Legal pages styling
+- `/app/frontend/src/App.js` - Main app (refactored)
+- `/app/frontend/src/components/` - Extracted components
