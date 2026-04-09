@@ -81,6 +81,25 @@ const Disclaimer = () => {
           </p>
         </section>
 
+        <section className="legal-section disclaimer-highlight">
+          <h2>DATA LATENCY NOTICE</h2>
+          <p>
+            <strong>BASE NETWORK DATA MAY EXPERIENCE DELAYS.</strong> Our Base network data is 
+            sourced from Covalent API, which may occasionally experience latency or timeout issues. 
+            This means:
+          </p>
+          <ul>
+            <li>Base network transactions may appear with a delay of several minutes</li>
+            <li>Some Base transactions may temporarily not appear during API outages</li>
+            <li>Solana network data (via Helius API) is typically more real-time</li>
+          </ul>
+          <p>
+            We have implemented retry mechanisms to improve reliability, but external API 
+            performance is outside our control. Do not rely solely on this service for 
+            time-sensitive trading decisions.
+          </p>
+        </section>
+
         <section className="legal-section">
           <h2>4. NO GUARANTEE OF RESULTS</h2>
           <p>

@@ -22,6 +22,7 @@ import TransactionList from "./components/TransactionList";
 import Footer from "./components/Footer";
 import SubscribeModal from "./components/SubscribeModal";
 import SettingsModal from "./components/SettingsModal";
+import DataNotice from "./components/DataNotice";
 import { loadSettings, saveSettings, convertFromUSD } from "./components/utils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -192,6 +193,9 @@ const Dashboard = () => {
           activeNetwork={activeNetwork}
           setActiveNetwork={setActiveNetwork}
         />
+
+        {/* Data Notice */}
+        <DataNotice />
 
         {/* Transaction List */}
         <TransactionList
