@@ -16,72 +16,104 @@ Build a real-time Whale Transaction Tracker for the Solana and Base networks cal
 - [x] Support for Solana (Helius API) and Base (Covalent API) networks
 - [x] Threshold filtering: Only transactions > $100,000 CAD
 - [x] Terminal-style UI with black background and green text
-- [x] Email subscription for alerts
+- [x] Email subscription for alerts (SendGrid)
 - [x] Auto-refresh every 30 seconds
 - [x] Sound notifications for new whale moves
+- [x] Telegram Bot alerts (paid subscription via Stripe)
+- [x] Legal/Compliance pages (Privacy Policy, Terms of Service, Disclaimer)
 
 ## What's Been Implemented
-### Date: 2026-03-27
+
+### Date: 2026-04-09
+- **Legal Pages Added**:
+  - `/privacy` - Privacy Policy (required by Stripe)
+  - `/terms` - Terms of Service
+  - `/disclaimer` - "Not Financial Advice" disclaimer (crypto regulatory protection)
+  - Footer links to all legal pages on main dashboard
+  - Terminal-themed styling consistent with app
+
+### Previous Implementation
 - **Backend (FastAPI)**:
-  - GET /api/transactions - Fetches whale transactions from Solana and Base
-  - POST /api/subscribe - Email subscription endpoint
-  - GET /api/health - Health check endpoint
-  - GET /api/exchange-rate - USD to CAD rate
-  - Both Helius and Covalent API keys configured
-  - Sample data generation for demonstration
+  - GET /api/transactions - Fetches whale transactions from MongoDB
+  - POST /api/subscribe - Email subscription (SendGrid)
+  - POST /api/create-checkout-session - Stripe checkout
+  - POST /api/generate-telegram-code - Connect flow
+  - POST /api/telegram/connect - Verify Telegram connection
+  - GET /api/health - Health check
+  - Background worker (whale_fetcher.py) - Polls Helius/Covalent APIs
+  - Telegram Bot (telegram_bot.py) - Sends premium alerts
 
 - **Frontend (React)**:
   - Terminal-themed dashboard with JetBrains Mono font
-  - Scanline overlay effect for authentic terminal look
+  - ASCII whaling ship animation header
   - Stats bar: Total Volume, Largest Move, Solana TXs, Base TXs
   - Network filter tabs (ALL, SOLANA, BASE)
-  - Scrolling transaction list with Token Name, CAD Amount, Explorer Link
+  - Settings modal (threshold, currency, refresh interval)
   - Subscribe modal for email alerts
-  - Auto-refresh every 30 seconds with LIVE indicator
-  - **Sound notifications toggle** for new whale moves
-  - **NEW badge** highlighting fresh transactions
-  - Responsive design for mobile/desktop
-
-## Prioritized Backlog
-
-### P0 - Critical (Done)
-- [x] Transaction list display
-- [x] Network filtering
-- [x] CAD amount display
-- [x] Explorer links
-- [x] Subscribe button/modal
-- [x] Sound notifications
-
-### P1 - High Priority (For Future)
-- [ ] Actual email sending for alerts (SendGrid integration)
-- [ ] WebSocket for real-time updates instead of polling
-- [ ] Historical data storage and charts
-
-### P2 - Nice to Have
-- [ ] Price alerts threshold customization
-- [ ] Multiple threshold tiers (100K, 500K, 1M)
-- [ ] Transaction history export (CSV)
-- [ ] Mobile PWA support
+  - Pricing page with Stripe integration
+  - Telegram connect flow page
+  - Sound notifications toggle
+  - LocalStorage persistence for settings
 
 ## Architecture
 ```
-Frontend (React + TailwindCSS)
+Frontend (React)
     |
     v
 Backend (FastAPI)
     |
     +---> Helius API (Solana) ✓
     +---> Covalent API (Base) ✓
-    +---> MongoDB (Email subscriptions)
+    +---> MongoDB (transactions, subscriptions)
+    +---> SendGrid (email alerts)
+    +---> Stripe (payments)
+    +---> Telegram Bot API (premium alerts)
+
+Supervisor Processes:
+    1. backend (FastAPI server)
+    2. whale_fetcher (background data poller)
+    3. telegram_bot (Telegram long polling)
 ```
 
 ## Tech Stack
-- Frontend: React 19, TailwindCSS, Lucide Icons
+- Frontend: React 19, TailwindCSS, Lucide Icons, React Router
 - Backend: FastAPI, httpx, Motor (MongoDB async)
 - Database: MongoDB
-- APIs: Helius (Solana), Covalent (Base)
+- APIs: Helius (Solana), Covalent (Base), SendGrid, Stripe, Telegram
 
-## Next Tasks
-1. Add SendGrid integration for actual email alerts
-2. Consider WebSocket for true real-time updates
-3. Add threshold customization options
+## Prioritized Backlog
+
+### P0 - Critical (DONE)
+- [x] Transaction list display
+- [x] Network filtering
+- [x] CAD amount display
+- [x] Explorer links
+- [x] Subscribe button/modal
+- [x] Sound notifications
+- [x] SendGrid email integration
+- [x] Stripe payment integration
+- [x] Telegram Bot integration
+- [x] Real on-chain data (Helius + Covalent)
+- [x] Legal pages (Privacy, Terms, Disclaimer)
+
+### P1 - High Priority (Future)
+- [ ] WebSocket for real-time updates instead of polling
+- [ ] Historical data storage and charts
+- [ ] Improve Covalent API reliability (occasional timeouts)
+
+### P2 - Nice to Have
+- [ ] Refactor App.js (~1000 lines → smaller components)
+- [ ] Transaction history export (CSV)
+- [ ] Mobile PWA support
+
+## Files Reference
+- `/app/backend/server.py` - Main FastAPI server
+- `/app/backend/whale_fetcher.py` - Background data poller
+- `/app/backend/telegram_bot.py` - Telegram bot script
+- `/app/frontend/src/App.js` - Main dashboard
+- `/app/frontend/src/PricingPage.js` - Stripe checkout UI
+- `/app/frontend/src/ConnectTelegramPage.js` - Telegram connect UI
+- `/app/frontend/src/PrivacyPolicy.js` - Privacy Policy page
+- `/app/frontend/src/TermsOfService.js` - Terms of Service page
+- `/app/frontend/src/Disclaimer.js` - Disclaimer page
+- `/app/frontend/src/LegalPages.css` - Legal pages styling

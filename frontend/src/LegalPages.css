@@ -1,0 +1,239 @@
+/* Legal Pages Styling - Terminal Theme */
+
+.legal-page {
+  min-height: 100vh;
+  background-color: #0a0a0a;
+  color: #00ff00;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  padding: 0;
+  position: relative;
+}
+
+.legal-page::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    linear-gradient(transparent 50%, rgba(0, 0, 0, 0.05) 50%);
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.legal-header {
+  position: sticky;
+  top: 0;
+  background: rgba(10, 10, 10, 0.95);
+  border-bottom: 1px solid #00ff00;
+  padding: 1rem 2rem;
+  z-index: 50;
+  backdrop-filter: blur(10px);
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: 1px solid #00ff00;
+  color: #00ff00;
+  padding: 0.5rem 1rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.back-btn:hover {
+  background: #00ff00;
+  color: #0a0a0a;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.legal-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+  line-height: 1.8;
+}
+
+.legal-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+  letter-spacing: 3px;
+}
+
+.legal-updated {
+  color: #00aa00;
+  font-size: 0.85rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed #00ff0033;
+}
+
+.legal-section {
+  margin-bottom: 2.5rem;
+}
+
+.legal-section h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #00ff00;
+  border-left: 3px solid #00ff00;
+  padding-left: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.legal-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.75rem;
+  color: #00dd00;
+}
+
+.legal-section p {
+  color: #00cc00;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.legal-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.legal-section li {
+  color: #00cc00;
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  position: relative;
+  font-size: 0.9rem;
+}
+
+.legal-section li::before {
+  content: '>';
+  position: absolute;
+  left: 0;
+  color: #00ff00;
+  font-weight: bold;
+}
+
+.legal-section strong {
+  color: #00ff00;
+}
+
+.contact-info {
+  background: rgba(0, 255, 0, 0.1);
+  border: 1px solid #00ff0033;
+  padding: 1rem;
+  font-family: inherit;
+  color: #00ff00;
+}
+
+/* Disclaimer specific styles */
+.disclaimer-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 2rem;
+  background: rgba(255, 165, 0, 0.1);
+  border: 2px solid #ffa500;
+  text-align: center;
+}
+
+.disclaimer-warning svg {
+  color: #ffa500;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+.disclaimer-warning .legal-title {
+  color: #ffa500;
+  text-shadow: 0 0 10px rgba(255, 165, 0, 0.5);
+}
+
+.disclaimer-highlight {
+  background: rgba(255, 165, 0, 0.05);
+  border: 1px solid #ffa50066;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.disclaimer-highlight h2 {
+  color: #ffa500;
+  border-left-color: #ffa500;
+}
+
+.disclaimer-highlight p {
+  color: #ffcc00;
+  font-size: 1rem;
+}
+
+.legal-footer {
+  text-align: center;
+  padding: 2rem;
+  border-top: 1px solid #00ff0033;
+  color: #00aa00;
+  font-size: 0.8rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .legal-content {
+    padding: 1rem;
+  }
+  
+  .legal-title {
+    font-size: 1.5rem;
+  }
+  
+  .legal-section h2 {
+    font-size: 1rem;
+  }
+  
+  .legal-header {
+    padding: 1rem;
+  }
+  
+  .back-btn {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+/* Link styles */
+.legal-footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.legal-footer-links a {
+  color: #00aa00;
+  text-decoration: none;
+  font-size: 0.75rem;
+  transition: color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.legal-footer-links a:hover {
+  color: #00ff00;
+  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+}

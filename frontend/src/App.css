@@ -617,6 +617,33 @@ body {
   margin-top: 2rem;
 }
 
+.terminal-footer p {
+  margin-bottom: 0.5rem;
+}
+
+.footer-legal-links {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--terminal-border);
+}
+
+.footer-legal-links a {
+  color: var(--terminal-green-dim);
+  text-decoration: none;
+  transition: all 0.15s linear;
+  cursor: pointer;
+}
+
+.footer-legal-links a:hover {
+  color: var(--terminal-green);
+  text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+}
+
+.footer-divider {
+  margin: 0 0.75rem;
+  color: var(--terminal-border);
+}
+
 /* Header Actions */
 .header-actions {
   display: flex;
