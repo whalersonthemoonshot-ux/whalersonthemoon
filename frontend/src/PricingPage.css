@@ -335,3 +335,118 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Single Tier Layout */
+.pricing-single {
+  max-width: 450px;
+  margin: 0 auto;
+}
+
+.free-info {
+  text-align: center;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px dashed rgba(0, 255, 65, 0.3);
+}
+
+.free-info h3 {
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+  color: #00FF41;
+  margin-bottom: 0.25rem;
+}
+
+.free-info p {
+  font-size: 0.75rem;
+  color: #008F11;
+  margin: 0;
+}
+
+.pricing-card.premium {
+  border-color: #00FF41;
+  box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
+}
+
+.trial-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #00FF41, #00BFFF);
+  color: #000;
+  padding: 0.35rem 1.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.tier-button.premium {
+  background: linear-gradient(135deg, #00FF41, #00BFFF);
+  color: #000;
+  font-size: 1rem;
+  padding: 1rem;
+}
+
+.tier-button.premium:hover:not(:disabled) {
+  box-shadow: 0 0 30px rgba(0, 255, 65, 0.5), 0 0 30px rgba(0, 191, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.email-input-inline {
+  margin-bottom: 1rem;
+}
+
+.email-input-inline input {
+  width: 100%;
+  background: #000;
+  border: 1px solid rgba(0, 255, 65, 0.5);
+  color: #00FF41;
+  padding: 0.875rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.email-input-inline input:focus {
+  outline: none;
+  border-color: #00FF41;
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+}
+
+.email-input-inline input::placeholder {
+  color: #008F11;
+}
+
+.trial-note {
+  text-align: center;
+  font-size: 0.7rem;
+  color: #008F11;
+  margin-top: 0.75rem;
+}
+
+.success-note {
+  color: #00BFFF;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.pricing-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pricing-footer p {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.connect-telegram-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+

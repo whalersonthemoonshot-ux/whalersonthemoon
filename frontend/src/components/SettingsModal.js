@@ -24,11 +24,11 @@ const SettingsModal = ({
   };
 
   const thresholdOptions = [
-    { value: 50000, label: `${CURRENCY_SYMBOLS[tempCurrency]}50K` },
-    { value: 100000, label: `${CURRENCY_SYMBOLS[tempCurrency]}100K` },
-    { value: 250000, label: `${CURRENCY_SYMBOLS[tempCurrency]}250K` },
-    { value: 500000, label: `${CURRENCY_SYMBOLS[tempCurrency]}500K` },
-    { value: 1000000, label: `${CURRENCY_SYMBOLS[tempCurrency]}1M` },
+    { value: 100, label: `${CURRENCY_SYMBOLS[tempCurrency]}100` },
+    { value: 500, label: `${CURRENCY_SYMBOLS[tempCurrency]}500` },
+    { value: 1000, label: `${CURRENCY_SYMBOLS[tempCurrency]}1K` },
+    { value: 5000, label: `${CURRENCY_SYMBOLS[tempCurrency]}5K` },
+    { value: 10000, label: `${CURRENCY_SYMBOLS[tempCurrency]}10K` },
   ];
 
   const intervalOptions = [

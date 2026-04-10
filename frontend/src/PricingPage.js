@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Check, Zap, Crown, ArrowLeft, Loader2 } from "lucide-react";
+import { Check, Zap, ArrowLeft, Loader2, Bell, MessageCircle, Clock, Shield } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -75,9 +75,9 @@ const PricingPage = () => {
     }
   };
 
-  const handleUpgrade = async (tier) => {
+  const handleStartTrial = async () => {
     if (!email) {
-      setError("Please enter your email address first");
+      setError("Please enter your email address");
       return;
     }
 
@@ -101,7 +101,7 @@ const PricingPage = () => {
       // Create checkout session
       const response = await axios.post(`${API}/checkout/create`, {
         email,
-        tier,
+        tier: "premium",
         origin_url: window.location.origin
       });
 
@@ -114,70 +114,19 @@ const PricingPage = () => {
     }
   };
 
-  const tiers = [
-    {
-      id: "free",
-      name: "Free",
-      price: "$0",
-      period: "forever",
-      description: "Basic whale watching",
-      features: [
-        "Website dashboard access",
-        "30 second refresh rate",
-        "Email alerts (manual)",
-        "All networks (Solana, Base)"
-      ],
-      icon: <Check size={24} />,
-      buttonText: "Current Plan",
-      disabled: true
-    },
-    {
-      id: "pro",
-      name: "Pro",
-      price: "$5",
-      period: "/month",
-      description: "For serious traders",
-      features: [
-        "Everything in Free",
-        "Instant Telegram alerts",
-        "15 second refresh rate",
-        "Priority email alerts",
-        "Custom threshold alerts"
-      ],
-      icon: <Zap size={24} />,
-      buttonText: "Upgrade to Pro",
-      popular: true
-    },
-    {
-      id: "whale",
-      name: "Whale",
-      price: "$10",
-      period: "/month",
-      description: "Maximum alpha",
-      features: [
-        "Everything in Pro",
-        "5 second refresh rate",
-        "API access",
-        "Multiple wallet tracking",
-        "Priority support",
-        "Early feature access"
-      ],
-      icon: <Crown size={24} />,
-      buttonText: "Go Whale"
-    }
-  ];
-
   if (paymentSuccess) {
     return (
       <div className="pricing-page">
         <div className="success-container">
           <div className="success-icon">🐋</div>
-          <h1>Welcome to {currentTier.charAt(0).toUpperCase() + currentTier.slice(1)}!</h1>
-          <p>Your subscription is now active.</p>
+          <h1>Welcome to Premium!</h1>
+          <p>Your 3-day free trial has started.</p>
+          <p className="success-note">You won't be charged until the trial ends.</p>
           
           <div className="success-actions">
             <button onClick={() => navigate("/connect-telegram")} className="connect-telegram-btn">
-              📱 Connect Telegram for Instant Alerts
+              <MessageCircle size={18} />
+              Connect Telegram for Instant Alerts
             </button>
             <button onClick={() => navigate("/")} className="back-btn">
               <ArrowLeft size={18} />
@@ -201,6 +150,8 @@ const PricingPage = () => {
     );
   }
 
+  const isPremium = currentTier === "premium";
+
   return (
     <div className="pricing-page">
       <div className="pricing-header">
@@ -208,68 +159,89 @@ const PricingPage = () => {
           <ArrowLeft size={18} />
           Back to Dashboard
         </button>
-        <h1>UPGRADE YOUR PLAN</h1>
-        <p>Get instant Telegram alerts when whales make moves</p>
+        <h1>UNLOCK WHALE ALERTS</h1>
+        <p>Get instant notifications when whales make big moves</p>
       </div>
 
       {error && <div className="pricing-error">{error}</div>}
 
-      <div className="email-input-section">
-        <label>YOUR EMAIL</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your email address"
-          data-testid="pricing-email-input"
-        />
-        {currentTier !== "free" && (
-          <p className="current-tier">Current plan: <strong>{currentTier.toUpperCase()}</strong></p>
-        )}
-      </div>
+      <div className="pricing-single">
+        {/* Free Tier Info */}
+        <div className="free-info">
+          <h3>FREE DASHBOARD ACCESS</h3>
+          <p>View whale transactions anytime on the dashboard</p>
+        </div>
 
-      <div className="pricing-grid">
-        {tiers.map((tier) => (
-          <div 
-            key={tier.id} 
-            className={`pricing-card ${tier.popular ? 'popular' : ''} ${currentTier === tier.id ? 'current' : ''}`}
-            data-testid={`tier-${tier.id}`}
-          >
-            {tier.popular && <div className="popular-badge">MOST POPULAR</div>}
-            {currentTier === tier.id && <div className="current-badge">CURRENT</div>}
-            
-            <div className="tier-icon">{tier.icon}</div>
-            <h2>{tier.name}</h2>
-            <div className="tier-price">
-              <span className="price">{tier.price}</span>
-              <span className="period">{tier.period}</span>
-            </div>
-            <p className="tier-description">{tier.description}</p>
-            
-            <ul className="tier-features">
-              {tier.features.map((feature, i) => (
-                <li key={i}>
-                  <Check size={16} />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-
-            <button
-              onClick={() => handleUpgrade(tier.id)}
-              disabled={tier.disabled || loading || currentTier === tier.id}
-              className={`tier-button ${tier.id}`}
-              data-testid={`upgrade-${tier.id}`}
-            >
-              {loading ? "Processing..." : currentTier === tier.id ? "Current Plan" : tier.buttonText}
-            </button>
+        {/* Premium Card */}
+        <div className={`pricing-card premium ${isPremium ? 'current' : ''}`} data-testid="tier-premium">
+          <div className="trial-badge">3-DAY FREE TRIAL</div>
+          {isPremium && <div className="current-badge">CURRENT PLAN</div>}
+          
+          <div className="tier-icon"><Zap size={32} /></div>
+          <h2>Premium</h2>
+          <div className="tier-price">
+            <span className="price">$9.99</span>
+            <span className="period">/month USD</span>
           </div>
-        ))}
+          <p className="tier-description">Full access to all whale alerts</p>
+          
+          <ul className="tier-features">
+            <li>
+              <MessageCircle size={16} />
+              Instant Telegram alerts
+            </li>
+            <li>
+              <Bell size={16} />
+              Priority email alerts
+            </li>
+            <li>
+              <Clock size={16} />
+              10-second refresh rate
+            </li>
+            <li>
+              <Shield size={16} />
+              Custom threshold alerts
+            </li>
+            <li>
+              <Check size={16} />
+              All networks (Solana + Base)
+            </li>
+            <li>
+              <Check size={16} />
+              Priority support
+            </li>
+          </ul>
+
+          {!isPremium && (
+            <div className="email-input-inline">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                data-testid="pricing-email-input"
+              />
+            </div>
+          )}
+
+          <button
+            onClick={handleStartTrial}
+            disabled={loading || isPremium}
+            className="tier-button premium"
+            data-testid="start-trial-btn"
+          >
+            {loading ? "Processing..." : isPremium ? "Current Plan" : "START FREE TRIAL"}
+          </button>
+          
+          {!isPremium && (
+            <p className="trial-note">No charge for 3 days. Cancel anytime.</p>
+          )}
+        </div>
       </div>
 
       <div className="pricing-footer">
-        <p>🔒 Secure payment powered by Stripe</p>
-        <p>Cancel anytime • No hidden fees</p>
+        <p><Shield size={14} /> Secure payment powered by Stripe</p>
+        <p>Cancel anytime • No hidden fees • Billed monthly after trial</p>
       </div>
     </div>
   );

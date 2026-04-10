@@ -38,9 +38,8 @@ telegram_bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
 # Subscription tiers (prices in USD)
 SUBSCRIPTION_TIERS = {
-    "free": {"price": 0.0, "name": "Free", "features": ["Website access", "30s refresh"]},
-    "pro": {"price": 5.0, "name": "Pro", "features": ["Instant Telegram alerts", "15s refresh", "Email alerts"]},
-    "whale": {"price": 10.0, "name": "Whale", "features": ["All Pro features", "Custom thresholds", "Priority support", "API access"]}
+    "free": {"price": 0.0, "name": "Free", "features": ["Dashboard access", "View whale transactions"]},
+    "premium": {"price": 9.99, "name": "Premium", "trial_days": 3, "features": ["Instant Telegram alerts", "Email alerts", "10s refresh rate", "Custom thresholds", "Priority support"]}
 }
 
 # Whale threshold in CAD
@@ -729,8 +728,8 @@ async def connect_telegram(input: TelegramConnect, background_tasks: BackgroundT
 @api_router.post("/checkout/create")
 async def create_checkout_session(request: Request, input: CheckoutRequest):
     """Create a Stripe checkout session for subscription upgrade"""
-    if input.tier not in ['pro', 'whale']:
-        raise HTTPException(status_code=400, detail="Invalid tier. Choose 'pro' or 'whale'")
+    if input.tier != 'premium':
+        raise HTTPException(status_code=400, detail="Invalid tier. Choose 'premium'")
     
     # Check if user exists
     sub = await db.subscriptions.find_one({"email": input.email})
@@ -739,6 +738,7 @@ async def create_checkout_session(request: Request, input: CheckoutRequest):
     
     # Get tier price
     amount = SUBSCRIPTION_TIERS[input.tier]['price']
+    trial_days = SUBSCRIPTION_TIERS[input.tier].get('trial_days', 0)
     
     # Create Stripe checkout
     host_url = str(request.base_url).rstrip('/')
