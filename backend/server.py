@@ -14,7 +14,7 @@ import asyncio
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 from telegram import Bot
-from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+import stripe
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -32,6 +32,9 @@ SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', '')
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', '')
+
+# Initialize Stripe
+stripe.api_key = STRIPE_API_KEY
 
 # Initialize Telegram Bot
 telegram_bot = Bot(token=TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
@@ -727,7 +730,7 @@ async def connect_telegram(input: TelegramConnect, background_tasks: BackgroundT
 
 @api_router.post("/checkout/create")
 async def create_checkout_session(request: Request, input: CheckoutRequest):
-    """Create a Stripe checkout session for subscription upgrade"""
+    """Create a Stripe checkout session for subscription with 3-day free trial"""
     if input.tier != 'premium':
         raise HTTPException(status_code=400, detail="Invalid tier. Choose 'premium'")
     
@@ -736,48 +739,73 @@ async def create_checkout_session(request: Request, input: CheckoutRequest):
     if not sub:
         raise HTTPException(status_code=404, detail="Please subscribe with your email first")
     
-    # Get tier price
-    amount = SUBSCRIPTION_TIERS[input.tier]['price']
-    trial_days = SUBSCRIPTION_TIERS[input.tier].get('trial_days', 0)
-    
-    # Create Stripe checkout
-    host_url = str(request.base_url).rstrip('/')
-    webhook_url = f"{host_url}/api/webhook/stripe"
-    
-    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    # Get tier config
+    tier_config = SUBSCRIPTION_TIERS[input.tier]
+    amount_cents = int(tier_config['price'] * 100)  # Stripe uses cents
+    trial_days = tier_config.get('trial_days', 0)
     
     success_url = f"{input.origin_url}/success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{input.origin_url}/"
+    cancel_url = f"{input.origin_url}/pricing"
     
-    checkout_request = CheckoutSessionRequest(
-        amount=amount,
-        currency="usd",
-        success_url=success_url,
-        cancel_url=cancel_url,
-        metadata={
-            "email": input.email,
-            "tier": input.tier
+    try:
+        # Create a Stripe Price for the subscription
+        price = stripe.Price.create(
+            unit_amount=amount_cents,
+            currency="usd",
+            recurring={"interval": "month"},
+            product_data={
+                "name": "Whalers Premium",
+                "description": "Instant whale alerts via Telegram & Email"
+            }
+        )
+        
+        # Create checkout session with trial
+        session_params = {
+            "mode": "subscription",
+            "payment_method_types": ["card"],
+            "line_items": [{
+                "price": price.id,
+                "quantity": 1
+            }],
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+            "customer_email": input.email,
+            "metadata": {
+                "email": input.email,
+                "tier": input.tier
+            }
         }
-    )
-    
-    session = await stripe_checkout.create_checkout_session(checkout_request)
-    
-    # Create payment transaction record
-    payment_doc = {
-        "id": str(uuid.uuid4()),
-        "email": input.email,
-        "tier": input.tier,
-        "amount": amount,
-        "currency": "usd",
-        "session_id": session.session_id,
-        "payment_status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.payment_transactions.insert_one(payment_doc)
-    
-    logger.info(f"Checkout session created for {input.email} - {input.tier}")
-    
-    return {"url": session.url, "session_id": session.session_id}
+        
+        # Add trial period if configured
+        if trial_days > 0:
+            session_params["subscription_data"] = {
+                "trial_period_days": trial_days
+            }
+        
+        session = stripe.checkout.Session.create(**session_params)
+        
+        # Create payment transaction record
+        payment_doc = {
+            "id": str(uuid.uuid4()),
+            "email": input.email,
+            "tier": input.tier,
+            "amount": tier_config['price'],
+            "currency": "usd",
+            "session_id": session.id,
+            "payment_status": "pending",
+            "has_trial": trial_days > 0,
+            "trial_days": trial_days,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.payment_transactions.insert_one(payment_doc)
+        
+        logger.info(f"Checkout session created for {input.email} - {input.tier} (trial: {trial_days} days)")
+        
+        return {"url": session.url, "session_id": session.id}
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error: {e}")
+        raise HTTPException(status_code=400, detail=f"Payment error: {str(e)}")
 
 
 @api_router.get("/checkout/status/{session_id}")
@@ -792,19 +820,16 @@ async def get_checkout_status(request: Request, session_id: str):
     if payment.get('payment_status') == 'paid':
         return {"status": "complete", "payment_status": "paid", "tier": payment.get('tier')}
     
-    # Check with Stripe
-    host_url = str(request.base_url).rstrip('/')
-    webhook_url = f"{host_url}/api/webhook/stripe"
-    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
-    
     try:
-        status = await stripe_checkout.get_checkout_status(session_id)
+        # Check with Stripe using native SDK
+        session = stripe.checkout.Session.retrieve(session_id)
         
-        if status.payment_status == 'paid':
+        # For subscriptions with trial, status is 'complete' even before payment
+        if session.status == 'complete':
             # Update payment record
             await db.payment_transactions.update_one(
                 {"session_id": session_id},
-                {"$set": {"payment_status": "paid"}}
+                {"$set": {"payment_status": "paid", "stripe_subscription_id": session.subscription}}
             )
             
             # Upgrade user subscription
@@ -813,16 +838,20 @@ async def get_checkout_status(request: Request, session_id: str):
             
             await db.subscriptions.update_one(
                 {"email": email},
-                {"$set": {"tier": tier}}
+                {"$set": {
+                    "tier": tier,
+                    "stripe_subscription_id": session.subscription,
+                    "trial_ends": payment.get('trial_days', 0) > 0
+                }}
             )
             
             logger.info(f"Subscription upgraded: {email} -> {tier}")
             
             return {"status": "complete", "payment_status": "paid", "tier": tier}
         
-        return {"status": status.status, "payment_status": status.payment_status}
+        return {"status": session.status, "payment_status": session.payment_status or "pending"}
         
-    except Exception as e:
+    except stripe.error.StripeError as e:
         logger.error(f"Error checking payment status: {e}")
         return {"status": "error", "payment_status": "unknown"}
 
@@ -832,17 +861,16 @@ async def stripe_webhook(request: Request):
     """Handle Stripe webhook events"""
     try:
         body = await request.body()
-        signature = request.headers.get("Stripe-Signature")
+        event = stripe.Event.construct_from(
+            stripe.util.convert_to_stripe_object(body.decode('utf-8')),
+            stripe.api_key
+        )
         
-        host_url = str(request.base_url).rstrip('/')
-        webhook_url = f"{host_url}/api/webhook/stripe"
-        stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
-        
-        webhook_response = await stripe_checkout.handle_webhook(body, signature)
-        
-        if webhook_response.payment_status == 'paid':
-            session_id = webhook_response.session_id
-            metadata = webhook_response.metadata
+        # Handle checkout.session.completed event
+        if event.type == 'checkout.session.completed':
+            session = event.data.object
+            session_id = session.id
+            metadata = session.get('metadata', {})
             
             email = metadata.get('email')
             tier = metadata.get('tier')
@@ -851,15 +879,27 @@ async def stripe_webhook(request: Request):
                 # Update payment and subscription
                 await db.payment_transactions.update_one(
                     {"session_id": session_id},
-                    {"$set": {"payment_status": "paid"}}
+                    {"$set": {"payment_status": "paid", "stripe_subscription_id": session.subscription}}
                 )
                 
                 await db.subscriptions.update_one(
                     {"email": email},
-                    {"$set": {"tier": tier}}
+                    {"$set": {"tier": tier, "stripe_subscription_id": session.subscription}}
                 )
                 
-                logger.info(f"Webhook: Subscription upgraded {email} -> {tier}")
+                logger.info(f"Webhook: Subscription activated {email} -> {tier}")
+        
+        # Handle subscription cancellation
+        elif event.type == 'customer.subscription.deleted':
+            subscription = event.data.object
+            sub_id = subscription.id
+            
+            # Find and downgrade user
+            await db.subscriptions.update_one(
+                {"stripe_subscription_id": sub_id},
+                {"$set": {"tier": "free", "stripe_subscription_id": None}}
+            )
+            logger.info(f"Webhook: Subscription cancelled - {sub_id}")
         
         return {"status": "ok"}
         
