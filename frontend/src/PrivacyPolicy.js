@@ -147,7 +147,7 @@ const PrivacyPolicy = () => {
             If you have questions or concerns about this Privacy Policy, please contact us at:
           </p>
           <p className="contact-info">
-            Email: privacy@whalersonthemoon.com
+            Email: privacy@whalersonthemoon.ca
           </p>
         </section>
       </div>

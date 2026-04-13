@@ -184,7 +184,7 @@ const Disclaimer = () => {
             If you have questions about this Disclaimer, please contact us at:
           </p>
           <p className="contact-info">
-            Email: legal@whalersonthemoon.com
+            Email: legal@whalersonthemoon.ca
           </p>
         </section>
       </div>
