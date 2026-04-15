@@ -22,6 +22,7 @@ const PricingPage = () => {
     if (sessionId) {
       pollPaymentStatus(sessionId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // Load email from localStorage
